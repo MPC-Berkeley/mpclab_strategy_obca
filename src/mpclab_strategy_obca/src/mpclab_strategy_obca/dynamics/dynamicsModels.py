@@ -14,12 +14,12 @@ class bike_dynamics_rk4(object):
 
 		self.M = params.M
 
-	def x_dot(self, x, u):
+	def f_ct(self, x, u):
 		beta = lambda d: atan2(self.L_r * tan(d), self.L_r + self.L_f)
 
-		x_dot = hcat([ x[3]*cos(x[2] + beta(u[0])),
+		x_dot = vcat([ x[3]*cos(x[2] + beta(u[0])),
 						x[3]*sin(x[2] + beta(u[0])),
-						x(3)*sin(beta(u[0])) / self.L_r, 
+						x[3]*sin(beta(u[0])) / self.L_r, 
 						u[1] ])
 
 		return x_dot
@@ -41,6 +41,6 @@ class bike_dynamics_rk4(object):
 		return x_kp1
 
 	def f_dt_aug(self, x_k, u_k):
-		x_kp1 = vertcat(self.f_dt(x_k, u_k), u_k)
+		x_kp1 = vcat([self.f_dt(x_k, u_k), u_k])
 
 		return x_kp1

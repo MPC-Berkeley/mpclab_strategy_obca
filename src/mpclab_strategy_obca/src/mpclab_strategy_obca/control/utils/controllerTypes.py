@@ -20,21 +20,21 @@ class strategyOBCAParams(PythonMsg):
     N: int = field(default=20)
 
     n_obs: int = field(default=3)
-    n_ineq: np.array = field(default=[4, 1, 1])
+    n_ineq: np.array = field(default=np.array([4, 1, 1]))
     d_ineq: int = field(default=2)
 
-    G: np.array = field(default=None)
-    g: np.array = field(default=None)
+    G: np.array = field(default=np.array([[1,0], [-1, 0], [0, 1], [0, -1]]))
+    g: np.array = field(default=np.array([2.45, 2.45, 1.03, 1.03]))
 
-    Q: np.array = field(default=None)
-    R: np.array = field(default=None)
+    Q: np.array = field(default=np.diag([10, 1, 1, 5]))
+    R: np.array = field(default=np.diag([1, 1]))
 
     d_min: float = field(default=0.01)
 
-    u_l: np.array = field(default=None)
-    u_u: np.array = field(default=None)
-    du_l: np.array = field(default=None)
-    du_u: np.array = field(default=None)
+    u_l: np.array = field(default=np.array([-0.5, -2.5]))
+    u_u: np.array = field(default=np.array([0.5, 1.5]))
+    du_l: np.array = field(default=np.array([-0.6, -8]))
+    du_u: np.array = field(default=np.array([0.6, 5]))
 
     optlevel: int = field(default=3)
 
