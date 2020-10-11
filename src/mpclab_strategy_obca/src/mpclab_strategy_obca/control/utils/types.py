@@ -12,6 +12,47 @@ class PythonMsg:
             object.__setattr__(self,key,value)
 
 @dataclass
+class PIDParams(PythonMsg):
+    dt: float = field(default=0.1)
+
+    Kp: float = field(default=2.0)
+    Ki: float = field(default=0.0)
+    Kd: float = field(default=0.0)
+
+    int_e_max: float = field(default=100)
+    int_e_min: float = field(default=-100)
+    u_max: float = field(default=None)
+    u_min: float = field(default=None)
+    du_max: float = field(default=None)
+    du_min: float = field(default=None)
+
+@dataclass
+class safetyParams(PythonMsg):
+    dt: float = field(default=0.1)
+
+    P_accel: float = field(default=1.0)
+    I_accel: float = field(default=0.0)
+    D_accel: float = field(default=0.0)
+
+    P_speed: float = field(default=1.0)
+    I_speed: float = field(default=0.0)
+    D_speed: float = field(default=0.0)
+
+    accel_int_e_max: float = field(default=100)
+    accel_int_e_min: float = field(default=-100)
+    accel_max: float = field(default=None)
+    accel_min: float = field(default=None)
+    daccel_max: float = field(default=None)
+    daccel_min: float = field(default=None)
+
+    speed_int_e_max: float = field(default=100)
+    speed_int_e_min: float = field(default=-100)
+    speed_max: float = field(default=None)
+    speed_min: float = field(default=None)
+    dspeed_max: float = field(default=None)
+    dspeed_min: float = field(default=None)
+
+@dataclass
 class strategyOBCAParams(PythonMsg):
     dt: float = field(default=0.1)
     n: int = field(default=4)
