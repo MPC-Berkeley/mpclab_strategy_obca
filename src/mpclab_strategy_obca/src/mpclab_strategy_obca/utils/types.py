@@ -12,10 +12,9 @@ class PythonMsg:
             object.__setattr__(self,key,value)
 
 @dataclass
-class dynamicsKinBikeParams(PythonMsg):
-    L_f: float = field(default=1.5)
-    L_r: float = field(default=1.5)
+class experimentParams(PythonMsg):
+    car_L: float = field(default=4.0)
+    car_W: float = field(default=1.5)
+    collision_buffer_r: float = field(default=1.0)
 
     dt: float = field(default=0.1)
-
-    M: int = field(default=10)
