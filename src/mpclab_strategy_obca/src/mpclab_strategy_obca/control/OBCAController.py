@@ -12,7 +12,7 @@ from mpclab_strategy_obca.control.utils.controllerTypes import strategyOBCAParam
 
 from mpclab_strategy_obca.dynamics.dynamicsModels import bike_dynamics_rk4
 
-class obca_controller(abstractController):
+class OBCAController(abstractController):
 	"""docstring for ClassName"""
 	def __init__(self, dynamics, params=strategyOBCAParams()):
 
@@ -22,9 +22,9 @@ class obca_controller(abstractController):
 
 		self.n_x = params.n
 		self.n_u = params.d
-		
+
 		self.N = params.N
-		
+
 		self.n_obs = params.n_obs
 		self.n_ineq = params.n_ineq # Number of constraints for each obstacle
 		self.d_ineq = params.d_ineq # Dimension of constraints for all obstacles
@@ -60,7 +60,7 @@ class obca_controller(abstractController):
 		self.opt_solver = None
 
 	def initialize(self, regen):
-		
+
 		if regen:
 			self.ws_solver = self.generate_ws_solver()
 			self.opt_solver = self.generate_opt_solver()
@@ -84,9 +84,9 @@ class obca_controller(abstractController):
 
 		# [lambda, mu, d]
 		ws_model.nvar = self.N_ineq + self.M_ineq + self.n_obs
-		ws_model.ub = np.hstack( [ float('inf') * np.ones(self.N_ineq + self.M_ineq), 
+		ws_model.ub = np.hstack( [ float('inf') * np.ones(self.N_ineq + self.M_ineq),
 									float('inf') * np.ones(self.n_obs) ] )
-		ws_model.lb = np.hstack( [np.zeros(self.N_ineq + self.M_ineq), 
+		ws_model.lb = np.hstack( [np.zeros(self.N_ineq + self.M_ineq),
 									-float('inf')*np.ones(self.n_obs)] )
 
 		# [obca dist, obca]
@@ -124,7 +124,7 @@ class obca_controller(abstractController):
 		return -ca.sum1(d)
 
 	def eval_ws_eq(self, z, p):
-		
+
 		t_ws = p[0:2]
 		R_ws = np.array( [ [ca.cos(p[2]), -ca.sin(p[2])],
 							[ca.sin(p[2]), ca.cos(p[2])] ] )
@@ -156,7 +156,7 @@ class obca_controller(abstractController):
 		return ws_eq
 
 	def eval_ws_ineq(self, z, p):
-		
+
 		ws_ineq = []
 
 		j = 0
@@ -196,27 +196,27 @@ class obca_controller(abstractController):
 
 			# [x_k, lambda_k, mu_k, u_k, u_km1]
 			nvar.append( self.n_x + self.N_ineq + self.M_ineq + self.n_u + self.n_u )
-			ub.append( np.hstack( [float('inf')*np.ones(self.n_x), 
-									float('inf')*np.ones(self.N_ineq+self.M_ineq), 
-									self.u_u, 
+			ub.append( np.hstack( [float('inf')*np.ones(self.n_x),
+									float('inf')*np.ones(self.N_ineq+self.M_ineq),
+									self.u_u,
 									self.u_u] ) )
-			lb.append( np.hstack( [-float('inf')*np.ones(self.n_x), 
-									np.ones(self.N_ineq+self.M_ineq), 
-									self.u_l, 
+			lb.append( np.hstack( [-float('inf')*np.ones(self.n_x),
+									np.ones(self.N_ineq+self.M_ineq),
+									self.u_l,
 									self.u_l] ) )
 
 			# [obca, obca_d, obca_norm, hyp, du]
 			nh.append( self.n_obs*self.d_ineq + self.n_obs + self.n_obs + 1 + self.n_u )
 			ineq.append( self.eval_opt_ineq )
-			hu.append( np.hstack( [1e-8*np.ones(self.n_obs*self.d_ineq), 
-									float('inf')*np.ones(self.n_obs), 
-									np.ones(self.n_obs), 
-									float('inf'), 
+			hu.append( np.hstack( [1e-8*np.ones(self.n_obs*self.d_ineq),
+									float('inf')*np.ones(self.n_obs),
+									np.ones(self.n_obs),
+									float('inf'),
 									self.dt*self.du_u] ) )
-			hl.append( np.hstack( [np.zeros(self.n_obs*self.d_ineq), 
-									self.d_min*np.ones(self.n_obs), 
-									-float('inf')*np.ones(self.n_obs), 
-									0, 
+			hl.append( np.hstack( [np.zeros(self.n_obs*self.d_ineq),
+									self.d_min*np.ones(self.n_obs),
+									-float('inf')*np.ones(self.n_obs),
+									0,
 									self.dt*self.du_l] ) )
 
 			# [x_ref, obs_A, obs_b, hyp_w, hyp_b]
@@ -231,7 +231,7 @@ class obca_controller(abstractController):
 				# [augmented dynamics, obca]
 				# neq.append( self.n_x + self.n_u + self.n_obs*self.d_ineq )
 				neq.append( self.n_x + self.n_u )
-				E.append( np.block( [ [np.eye(self.n_x), np.zeros((self.n_x, self.N_ineq + self.M_ineq + self.n_u + self.n_u))], 
+				E.append( np.block( [ [np.eye(self.n_x), np.zeros((self.n_x, self.N_ineq + self.M_ineq + self.n_u + self.n_u))],
 										[np.zeros((self.n_u, self.n_x+self.N_ineq+self.M_ineq+self.n_u)), np.eye(self.n_u)] ] ) )
 				eq.append( self.eval_opt_eq )
 
@@ -241,21 +241,21 @@ class obca_controller(abstractController):
 
 		# [x_k, lambda_k, mu_k]
 		nvar.append( self.n_x + self.N_ineq + self.M_ineq )
-		ub.append( np.hstack( [float('inf')*np.ones(self.n_x), 
+		ub.append( np.hstack( [float('inf')*np.ones(self.n_x),
 								float('inf')*np.ones(self.N_ineq + self.M_ineq)] ) )
-		lb.append( np.hstack( [-float('inf')*np.ones(self.n_x), 
+		lb.append( np.hstack( [-float('inf')*np.ones(self.n_x),
 								np.zeros(self.N_ineq + self.M_ineq)] ) )
 
 		# [obca, obca_d, obca_norm, hyp]
 		nh.append( self.n_obs*self.d_ineq + self.n_obs + self.n_obs + 1 )
 		ineq.append( self.eval_opt_ineq_N )
 		hu.append( np.hstack( [1e-8*np.ones(self.n_obs*self.d_ineq),
-								float('inf')*np.ones(self.n_obs), 
+								float('inf')*np.ones(self.n_obs),
 								np.ones(self.n_obs),
 								float('inf')] ) )
 		hl.append( np.hstack( [np.zeros(self.n_obs*self.d_ineq),
-								self.d_min*np.ones(self.n_obs), 
-								-float('inf')*np.ones(self.n_obs), 
+								self.d_min*np.ones(self.n_obs),
+								-float('inf')*np.ones(self.n_obs),
 								0] ) )
 
 		# [x_ref, obs_A, obs_b, hyp_w, hyp_b]
@@ -280,7 +280,7 @@ class obca_controller(abstractController):
 		print('hu', [t.shape for t in hu])
 		print('hl', [t.shape for t in hl])
 
-		opt_model.xinitidx = np.hstack((np.arange(self.n_x), 
+		opt_model.xinitidx = np.hstack((np.arange(self.n_x),
 										np.arange(self.n_x+self.N_ineq+self.M_ineq+self.n_u, self.n_x+self.N_ineq+self.M_ineq+self.n_u+self.n_u)))
 
 		opt_codeopts = forcespro.CodeOptions(self.opt_name)
