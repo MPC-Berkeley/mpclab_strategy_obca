@@ -12,7 +12,7 @@ from mpclab_strategy_obca.control.utils.controllerTypes import strategyOBCAParam
 
 from mpclab_strategy_obca.dynamics.dynamicsModels import bike_dynamics_rk4
 
-class OBCAController(abstractController):
+class StrategyOBCAController(abstractController):
 	"""docstring for ClassName"""
 	def __init__(self, dynamics, params=strategyOBCAParams()):
 
@@ -404,6 +404,10 @@ class OBCAController(abstractController):
 		opt_ineq = ca.vcat( [opt_ineq, ca.dot(hyp_w, x) - hyp_b] )
 
 		return opt_ineq
+
+class NaiveOBCAController(abstractController):
+	def __init__(self):
+		pass
 
 
 def main():

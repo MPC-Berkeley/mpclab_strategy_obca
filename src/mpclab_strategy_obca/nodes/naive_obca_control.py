@@ -2,7 +2,7 @@ import rospy
 
 from barc.msg import ECU, States
 
-from mpclab_strategy_obca.control.OBCAController import StrategyOBCAController
+from mpclab_strategy_obca.control.OBCAController import NaiveOBCAController
 from mpclab_strategy_obca.control.utils.controllerTypes import strategyOBCAParams
 
 class strategyOBCAControlNode(object):
@@ -13,7 +13,7 @@ class strategyOBCAControlNode(object):
         N = rospy.get_param('controller/obca/N')
 
         obca_params = strategyOBCAParams(dt=dt, N=N)
-        controller = StrategyOBCAController(obca_params)
+        controller = NaiveOBCAController(obca_params)
 
         # controller.initialize(regen=True)
 
