@@ -62,13 +62,16 @@ class obca_controller(abstractController):
 	def initialize(self, regen):
 		
 		if regen:
-			# self.ws_solver = self.generate_ws_solver()
+			self.ws_solver = self.generate_ws_solver()
 			self.opt_solver = self.generate_opt_solver()
 		else:
 			self.ws_solver = forcespro.nlp.Solver.from_directory('/path/to/solver')
 			self.opt_solver = forcespro.nlp.Solver.from_directory('/path/to/solver')
 
 	def solve(self):
+		pass
+
+	def solve_ws(self, z, u, obs):
 		pass
 
 	def generate_ws_solver(self):
@@ -80,7 +83,7 @@ class obca_controller(abstractController):
 		ws_model.objectiveN = lambda z: 0
 
 		# [lambda, mu, d]
-		ws_model.nvar = self.N_ineq + self.M_ineq + self.n_obs;
+		ws_model.nvar = self.N_ineq + self.M_ineq + self.n_obs
 		ws_model.ub = np.hstack( [ float('inf') * np.ones(self.N_ineq + self.M_ineq), 
 									float('inf') * np.ones(self.n_obs) ] )
 		ws_model.lb = np.hstack( [np.zeros(self.N_ineq + self.M_ineq), 
@@ -91,34 +94,32 @@ class obca_controller(abstractController):
 		ws_model.eq = self.eval_ws_eq
 		# ws_model.E = 0.1*np.ones((ws_model.neq, ws_model.nvar))
 		ws_model.E = np.hstack( [np.eye(ws_model.neq), np.zeros((ws_model.neq, ws_model.nvar-ws_model.neq))] )
-		print('ws_model.E', ws_model.E)
-		print('neq', ws_model.neq)
-		print('nvar', ws_model.nvar)
 
 		# [obca norm]
-		ws_model.nh = self.n_obs;
-		ws_model.ineq = self.eval_ws_ineq;
-		ws_model.hu = np.ones(self.n_obs);
-		ws_model.hl = -float('inf')*np.ones(self.n_obs);
+		ws_model.nh = self.n_obs
+		ws_model.ineq = self.eval_ws_ineq
+		ws_model.hu = np.ones(self.n_obs)
+		ws_model.hl = -float('inf')*np.ones(self.n_obs)
 
 		# [x_ref, obs_A, obs_b]
-		ws_model.npar = self.n_x + self.N_ineq*self.d_ineq + self.N_ineq;
+		ws_model.npar = self.n_x + self.N_ineq*self.d_ineq + self.N_ineq
 
 		ws_codeopts = forcespro.CodeOptions(self.ws_name)
 
-		ws_codeopts.overwrite = 1;
-		ws_codeopts.printlevel = 1;
-		ws_codeopts.optlevel = self.optlevel;
-		ws_codeopts.BuildSimulinkBlock = 0;
-		ws_codeopts.nlp.linear_solver = 'symm_indefinite';
-		ws_codeopts.nlp.ad_tool = 'casadi-3.5.1';
+		ws_codeopts.overwrite = 1
+		ws_codeopts.printlevel = 1
+		ws_codeopts.optlevel = self.optlevel
+		ws_codeopts.BuildSimulinkBlock = 0
+		ws_codeopts.dump_formulation = 0
+		ws_codeopts.nlp.linear_solver = 'symm_indefinite'
+		ws_codeopts.nlp.ad_tool = 'casadi-3.5.1'
 
 		return ws_model.generate_solver(ws_codeopts)
 
 
 	def eval_ws_obj(self, z):
 
-		d = z[self.N_ineq + self.M_ineq:] # d = z(N_ineq+M_ineq+1:end);
+		d = z[self.N_ineq + self.M_ineq:] # d = z(N_ineq+M_ineq+1:end)
 
 		return -ca.sum1(d)
 
@@ -204,14 +205,16 @@ class obca_controller(abstractController):
 									self.u_l, 
 									self.u_l] ) )
 
-			# [obca_d, obca_norm, hyp, du]
-			nh.append( self.n_obs + self.n_obs + 1 + self.n_u )
+			# [obca, obca_d, obca_norm, hyp, du]
+			nh.append( self.n_obs*self.d_ineq + self.n_obs + self.n_obs + 1 + self.n_u )
 			ineq.append( self.eval_opt_ineq )
-			hu.append( np.hstack( [float('inf')*np.ones(self.n_obs), 
+			hu.append( np.hstack( [1e-8*np.ones(self.n_obs*self.d_ineq), 
+									float('inf')*np.ones(self.n_obs), 
 									np.ones(self.n_obs), 
 									float('inf'), 
 									self.dt*self.du_u] ) )
-			hl.append( np.hstack( [self.d_min*np.ones(self.n_obs), 
+			hl.append( np.hstack( [np.zeros(self.n_obs*self.d_ineq), 
+									self.d_min*np.ones(self.n_obs), 
 									-float('inf')*np.ones(self.n_obs), 
 									0, 
 									self.dt*self.du_l] ) )
@@ -220,18 +223,16 @@ class obca_controller(abstractController):
 			npar.append( self.n_x + self.N_ineq*self.d_ineq + self.N_ineq + self.n_x + 1 )
 			if i == opt_model.N - 2:
 				# [dynamics, obca]
-				neq.append( self.n_x + self.n_obs*self.d_ineq )
-				# E.append( np.block( [ [np.eye(self.n_x), np.zeros((self.n_x, self.N_ineq+self.M_ineq))], 
-				# 						[np.zeros((self.n_obs*self.d_ineq, self.n_x + self.N_ineq + self.M_ineq)) ] ] ) )
-				E.append( np.hstack( [np.eye(10), np.zeros((10,12))] ) )
+				# neq.append( self.n_x + self.n_obs*self.d_ineq )
+				neq.append(self.n_x)
+				E.append( np.hstack( [np.eye(self.n_x), np.zeros((self.n_x, self.N_ineq+self.M_ineq))] ) )
 				eq.append( self.eval_opt_eq_Nm1 )
 			else:
 				# [augmented dynamics, obca]
-				neq.append( self.n_x + self.n_u + self.n_obs*self.d_ineq )
-				# E.append( np.block( [ [np.eye(self.n_x), np.zeros((self.n_x, self.N_ineq + self.M_ineq + self.n_u + self.n_u))], 
-				# 						[np.zeros((self.n_u, self.n_x+self.N_ineq+self.M_ineq+self.n_u)), np.eye(self.n_u)], 
-				# 						[np.zeros((self.n_obs*self.d_ineq, self.n_x+self.N_ineq+self.M_ineq+self.n_u+self.n_u))] ] ) )
-				E.append( np.hstack( [np.eye(12), np.zeros((12,14))] ) )
+				# neq.append( self.n_x + self.n_u + self.n_obs*self.d_ineq )
+				neq.append( self.n_x + self.n_u )
+				E.append( np.block( [ [np.eye(self.n_x), np.zeros((self.n_x, self.N_ineq + self.M_ineq + self.n_u + self.n_u))], 
+										[np.zeros((self.n_u, self.n_x+self.N_ineq+self.M_ineq+self.n_u)), np.eye(self.n_u)] ] ) )
 				eq.append( self.eval_opt_eq )
 
 
@@ -245,13 +246,15 @@ class obca_controller(abstractController):
 		lb.append( np.hstack( [-float('inf')*np.ones(self.n_x), 
 								np.zeros(self.N_ineq + self.M_ineq)] ) )
 
-		# [obca_d, obca_norm, hyp]
-		nh.append( self.n_obs + self.n_obs + 1 )
+		# [obca, obca_d, obca_norm, hyp]
+		nh.append( self.n_obs*self.d_ineq + self.n_obs + self.n_obs + 1 )
 		ineq.append( self.eval_opt_ineq_N )
-		hu.append( np.hstack( [float('inf')*np.ones(self.n_obs), 
+		hu.append( np.hstack( [1e-8*np.ones(self.n_obs*self.d_ineq),
+								float('inf')*np.ones(self.n_obs), 
 								np.ones(self.n_obs),
 								float('inf')] ) )
-		hl.append( np.hstack( [self.d_min*np.ones(self.n_obs), 
+		hl.append( np.hstack( [np.zeros(self.n_obs*self.d_ineq),
+								self.d_min*np.ones(self.n_obs), 
 								-float('inf')*np.ones(self.n_obs), 
 								0] ) )
 
@@ -273,6 +276,9 @@ class obca_controller(abstractController):
 		opt_model.hl = hl
 		opt_model.ub = ub
 		opt_model.lb = lb
+		print('nh', nh)
+		print('hu', [t.shape for t in hu])
+		print('hl', [t.shape for t in hl])
 
 		opt_model.xinitidx = np.hstack((np.arange(self.n_x), 
 										np.arange(self.n_x+self.N_ineq+self.M_ineq+self.n_u, self.n_x+self.N_ineq+self.M_ineq+self.n_u+self.n_u)))
@@ -282,6 +288,7 @@ class obca_controller(abstractController):
 		opt_codeopts.printlevel = 2
 		opt_codeopts.optlevel = self.optlevel
 		opt_codeopts.BuildSimulinkBlock = 0
+		opt_codeopts.dump_formulation = 0
 
 		opt_codeopts.nlp.ad_tool = 'casadi-3.5.1'
 		opt_codeopts.nlp.linear_solver = 'symm_indefinite'
@@ -319,55 +326,13 @@ class obca_controller(abstractController):
 		x = z[:self.n_x]
 		u = z[self.n_x+self.N_ineq+self.M_ineq : self.n_x+self.N_ineq+self.M_ineq+self.n_u]
 
-		R_opt = np.array([ [ca.cos(z[2]), -ca.sin(z[2])], [ca.sin(z[2]), ca.cos(z[2])] ])
-
-		j = 0
-
-		opt_eq = self.dynamics.f_dt_aug(x, u)
-
-		obca = []
-
-		for i in range(self.n_obs):
-			A = p[ self.n_x + j*self.d_ineq : self.n_x + (j+self.n_ineq[i])*self.d_ineq ].reshape( (self.n_ineq[i], self.d_ineq) )
-
-			Lambda = z[ self.n_x + j : self.n_x + j + self.n_ineq[i] ]
-
-			mu = z[ self.n_x + self.N_ineq + (i-1)*self.m_ineq : self.n_x + self.N_ineq + i*self.m_ineq ]
-
-			obca.append( ca.mtimes( ca.transpose(self.G), mu) + ca.mtimes( ca.transpose(ca.mtimes(A, R_opt)), Lambda ) )
-
-			j += self.n_ineq[i]
-
-		opt_eq = ca.vcat( [opt_eq, ca.vcat(obca)] )
-
-		return opt_eq
+		return self.dynamics.f_dt_aug(x, u)
 
 	def eval_opt_eq_Nm1(self, z, p):
 		x = z[:self.n_x]
 		u = z[self.n_x+self.N_ineq+self.M_ineq : self.n_x+self.N_ineq+self.M_ineq+self.n_u]
 
-		R_opt = np.array([ [ca.cos(z[2]), -ca.sin(z[2])], [ca.sin(z[2]), ca.cos(z[2])] ])
-
-		j = 0
-
-		opt_eq = self.dynamics.f_dt(x, u)
-
-		obca = []
-
-		for i in range(self.n_obs):
-			A = p[ self.n_x + j*self.d_ineq : self.n_x + (j+self.n_ineq[i])*self.d_ineq ].reshape( (self.n_ineq[i], self.d_ineq) )
-
-			Lambda = z[ self.n_x + j : self.n_x + j + self.n_ineq[i] ]
-
-			mu = z[ self.n_x + self.N_ineq + (i-1)*self.m_ineq : self.n_x + self.N_ineq + i*self.m_ineq ]
-
-			obca.append( ca.mtimes( ca.transpose(self.G), mu) + ca.mtimes( ca.transpose(ca.mtimes(A, R_opt)), Lambda ) )
-
-			j += self.n_ineq[i]
-
-		opt_eq = ca.vcat( [opt_eq, ca.vcat(obca)] )
-
-		return opt_eq
+		return self.dynamics.f_dt(x, u)
 
 	def eval_opt_ineq(self, z, p):
 		x = z[:self.n_x]
@@ -375,10 +340,12 @@ class obca_controller(abstractController):
 
 		u_p = z[self.n_x+self.N_ineq+self.M_ineq+self.n_u : self.n_x+self.N_ineq+self.M_ineq+self.n_u+self.n_u]
 		hyp_w = p[self.n_x+self.N_ineq*self.d_ineq+self.N_ineq : self.n_x+self.N_ineq*self.d_ineq+self.N_ineq+self.n_x]
-		hyp_b = p[self.n_x+self.N_ineq*self.d_ineq+self.N_ineq+self.n_x];
+		hyp_b = p[self.n_x+self.N_ineq*self.d_ineq+self.N_ineq+self.n_x]
 
 		t_opt = z[0:2]
+		R_opt = np.array([ [ca.cos(z[2]), -ca.sin(z[2])], [ca.sin(z[2]), ca.cos(z[2])] ])
 
+		obca = []
 		obca_d = []
 		obca_norm = []
 
@@ -392,12 +359,13 @@ class obca_controller(abstractController):
 
 			mu = z[ self.n_x + self.N_ineq + (i-1)*self.m_ineq : self.n_x + self.N_ineq + i*self.m_ineq ]
 
+			obca.append( ca.mtimes( ca.transpose(self.G), mu) + ca.mtimes( ca.transpose(ca.mtimes(A, R_opt)), Lambda ) )
 			obca_d.append( -ca.dot(self.g, mu) + ca.dot(ca.mtimes(A, t_opt)-b, Lambda) )
 			obca_norm.append( ca.dot(ca.mtimes( ca.transpose(A), Lambda), ca.mtimes( ca.transpose(A), Lambda)) )
 
 			j += self.n_ineq[i]
 
-		opt_ineq = ca.vcat( [ca.vcat(obca_d), ca.vcat(obca_norm)] )
+		opt_ineq = ca.vcat( [ca.vcat(obca), ca.vcat(obca_d), ca.vcat(obca_norm)] )
 		opt_ineq = ca.vcat( [opt_ineq, ca.dot(hyp_w, x) - hyp_b] )
 		opt_ineq = ca.vcat( [opt_ineq, u-u_p] )
 
@@ -407,10 +375,12 @@ class obca_controller(abstractController):
 		x = z[:self.n_x]
 
 		hyp_w = p[self.n_x+self.N_ineq*self.d_ineq+self.N_ineq : self.n_x+self.N_ineq*self.d_ineq+self.N_ineq+self.n_x]
-		hyp_b = p[self.n_x+self.N_ineq*self.d_ineq+self.N_ineq+self.n_x];
+		hyp_b = p[self.n_x+self.N_ineq*self.d_ineq+self.N_ineq+self.n_x]
 
 		t_opt = z[0:2]
+		R_opt = np.array([ [ca.cos(z[2]), -ca.sin(z[2])], [ca.sin(z[2]), ca.cos(z[2])] ])
 
+		obca = []
 		obca_d = []
 		obca_norm = []
 
@@ -424,12 +394,13 @@ class obca_controller(abstractController):
 
 			mu = z[ self.n_x + self.N_ineq + (i-1)*self.m_ineq : self.n_x + self.N_ineq + i*self.m_ineq ]
 
+			obca.append( ca.mtimes( ca.transpose(self.G), mu) + ca.mtimes( ca.transpose(ca.mtimes(A, R_opt)), Lambda ) )
 			obca_d.append( -ca.dot(self.g, mu) + ca.dot(ca.mtimes(A, t_opt)-b, Lambda) )
 			obca_norm.append( ca.dot(ca.mtimes( ca.transpose(A), Lambda), ca.mtimes( ca.transpose(A), Lambda)) )
 
 			j += self.n_ineq[i]
 
-		opt_ineq = ca.vcat( [ca.vcat(obca_d), ca.vcat(obca_norm)] )
+		opt_ineq = ca.vcat( [ca.vcat(obca), ca.vcat(obca_d), ca.vcat(obca_norm)] )
 		opt_ineq = ca.vcat( [opt_ineq, ca.dot(hyp_w, x) - hyp_b] )
 
 		return opt_ineq
@@ -439,7 +410,6 @@ def main():
 	dynamics = bike_dynamics_rk4()
 	controller = obca_controller(dynamics)
 	controller.initialize(regen=True)
-	# print(controller.eval_opt_eq(np.zeros(26), np.zeros(27)))
 
 if __name__ == '__main__':
 	main()
