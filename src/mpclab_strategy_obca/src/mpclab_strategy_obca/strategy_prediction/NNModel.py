@@ -47,6 +47,10 @@ class Net(nn.Module):
 def load_matlab_network(filename):
     vars = loadmat(filename)
 
+    pdb.set_trace()
+    if 'net' not in vars.keys():
+        raise RuntimeError("The .mat file must have the variable 'net', a MATLAB 'network' object")
+
     net = vars['net']
     d_in = net['IW'][0,0][0][0].shape[1]
     d_layers = [net['IW'][0,0][0][0].shape[0]]
