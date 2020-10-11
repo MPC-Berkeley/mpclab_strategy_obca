@@ -3,7 +3,7 @@ import rospy
 from barc.msg import ECU, States
 
 from mpclab_strategy_obca.control.OBCAController import NaiveOBCAController
-from mpclab_strategy_obca.control.utils.controllerTypes import strategyOBCAParams
+from mpclab_strategy_obca.control.utils.types import strategyOBCAParams
 
 class strategyOBCAControlNode(object):
     def __init__(self):

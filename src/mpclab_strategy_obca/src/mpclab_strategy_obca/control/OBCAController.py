@@ -8,7 +8,7 @@ import forcespro.nlp
 
 from mpclab_strategy_obca.control.abstractController import abstractController
 
-from mpclab_strategy_obca.control.utils.controllerTypes import strategyOBCAParams
+from mpclab_strategy_obca.control.utils.types import strategyOBCAParams
 
 from mpclab_strategy_obca.dynamics.dynamicsModels import bike_dynamics_rk4
 

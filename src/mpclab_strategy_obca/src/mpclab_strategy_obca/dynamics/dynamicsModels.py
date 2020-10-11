@@ -2,7 +2,7 @@
 
 from casadi import *
 
-from mpclab_strategy_obca.dynamics.utils.dynamicsTypes import dynamicsKinBikeParams
+from mpclab_strategy_obca.dynamics.utils.types import dynamicsKinBikeParams
 
 class bike_dynamics_rk4(object):
 	"""docstring for bike_dynamics_rk4"""
@@ -19,13 +19,13 @@ class bike_dynamics_rk4(object):
 
 		x_dot = vcat([ x[3]*cos(x[2] + beta(u[0])),
 						x[3]*sin(x[2] + beta(u[0])),
-						x[3]*sin(beta(u[0])) / self.L_r, 
+						x[3]*sin(beta(u[0])) / self.L_r,
 						u[1] ])
 
 		return x_dot
 
 	def f_dt(self, x_k, u_k):
-		
+
 		h_k = self.dt / self.M
 
 		# Runge-Kutta to obtain discrete time dynamics
