@@ -52,3 +52,6 @@ CATKIN_IGNORE
 # Sublime
 *.sublime-project
 *.sublime-workspace
+
+*.mat
+*.mat*
