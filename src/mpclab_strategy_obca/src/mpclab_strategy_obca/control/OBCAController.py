@@ -564,23 +564,22 @@ class NaiveOBCAController(abstractController):
 def main():
 	dynamics = bike_dynamics_rk4()
 	controller = StrategyOBCAController(dynamics)
-	controller.initialize(regen=False)
+	controller.initialize(regen=True)
 
 	# Generate fake obs to test the ws solver
 	obs = []
-	for i in range(3):
-		obs_k = []
-		if i == 1:
-			for _ in range(21):
-				obs_k.append( {"A": np.zeros((4,2)), "b": np.zeros((4,1))} )
-		else:
-			for _ in range(21):
-				obs_k.append( {"A": np.zeros(2), "b": np.zeros(1)} )
+	for _ in range(21):
+		obs_i = []
+		for i in range(3):
+			if i == 1:
+				obs_i.append( {"A": np.zeros((4,2)), "b": np.zeros((4,1))} )
+			else:
+				obs_i.append( {"A": np.zeros(2), "b": np.zeros(1)} )
+		
+		obs.append(obs_i)
 
-		obs.append(obs_k)
-
-	z_ws = np.zeros((4, 21))
-	u_ws = np.zeros((2, 20))
+	z_ws = np.zeros((21, 4))
+	u_ws = np.zeros((20, 2))
 
 	controller.solve_ws(z_ws, u_ws, obs)
 

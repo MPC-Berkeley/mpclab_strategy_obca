@@ -20,7 +20,7 @@ class bike_dynamics_rk4(object):
 		if type == 'casadi':
 			beta = lambda d: ca.atan2(self.L_r * ca.tan(d), self.L_r + self.L_f)
 
-			x_dot = vcat([ x[3]*ca.cos(x[2] + ca.beta(u[0])),
+			x_dot = ca.vcat([ x[3]*ca.cos(x[2] + beta(u[0])),
 							x[3]*ca.sin(x[2] + beta(u[0])),
 							x[3]*ca.sin(beta(u[0])) / self.L_r,
 							u[1] ])
