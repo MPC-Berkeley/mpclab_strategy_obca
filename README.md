@@ -16,4 +16,4 @@ The `--extend` flag stops overwriting from sourcing the `setup.bash` from this p
 
 Dependencies:
 - APT: `libgmp3-dev` (required for `pypoman`)
-- Python: `numpy`, `scipy`, `torch`, `pypoman`, `casadi==3.5.1`, [`forcespro`](https://forces.embotech.com/Documentation/installation/python.html)
+- Python: `numpy`, `scipy`, `torch`, `pypoman`, `pyclipper`, `casadi==3.5.1`, [`forcespro`](https://forces.embotech.com/Documentation/installation/python.html)

@@ -2,12 +2,23 @@
 
 import numpy as np
 from numpy import sin, cos
-from pypoman import compute_polytope_halfspaces
+from pypoman import compute_polytope_halfspaces, compute_polytope_vertices, intersect_polygons
 
 import pdb
 
 def check_collision_poly(P_1, P_2):
-    pass
+    A_1, b_1 = P_1['A'], P_1['b']
+    A_2, b_2 = P_2['A'], P_2['b']
+
+    V_1 = compute_polytope_vertices(A_1, b_1)
+    V_2 = compute_polytope_vertices(A_2, b_2)
+
+    isect = intersect_polygons(V_1, V_2)
+
+    if not isect:
+        return False
+
+    return True
 
 def get_car_poly(Z, W, L):
     # Function to get the halfspace representation of a rectangular car given its states and dimensions
@@ -37,8 +48,13 @@ def get_car_poly(Z, W, L):
     return obs
 
 if __name__ == '__main__':
-    states = np.random.rand(10,4)
     W = 2
     L = 4
 
-    obs = get_car_poly(states, W, L)
+    s_1 = np.array([[0,0,0,0]])
+    s_2 = np.array([[4,0,0,0]])
+    obs_1 = get_car_poly(s_1, W, L)
+    obs_2 = get_car_poly(s_2, W, L)
+
+    collision = check_collision_poly(obs_1[0], obs_2[0])
+    pdb.set_trace()
