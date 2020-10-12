@@ -22,6 +22,9 @@ class NNParams(PythonMsg):
 
     no_grad: bool = field(default=False)
 
+    standardize_max: np.array = field(default=None)
+    standardize_min: np.array = field(default=None)
+
 @dataclass
 class strategyPredictorParams(PythonMsg):
     nn_model_file: str = field(default='')

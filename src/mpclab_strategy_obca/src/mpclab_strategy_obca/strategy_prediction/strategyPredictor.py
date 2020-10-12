@@ -45,12 +45,16 @@ class strategyPredictor(abstractStrategyPredictor):
         return xm/np.sum(xm)
 
 if __name__ == '__main__':
-    import torch
+    import pdb
 
-    strat_params = strategyPredictorParams(nn_model_file='nn_strategy_TF-trainscg_h-40_AC-tansig_ep2000_CE0.17453_2020-08-04_15-42.mat')
+    strat_params = strategyPredictorParams(nn_model_file='/home/mpcbarc/strategy_classification_models/nn_strategy_TF-trainscg_h-40_AC-tansig_ep2000_CE0.17453_2020-08-04_15-42.mat',
+        smooth_prediction=False)
     strat_pred = strategyPredictor(strat_params)
 
-    x = np.random.randn(strat_pred.nn_params.d_in)
+    np.random.seed(1)
+    x = np.random.rand(strat_pred.nn_params.d_in)
     pred = strat_pred.predict(x)
 
     print(pred)
+
+    pdb.set_trace()
