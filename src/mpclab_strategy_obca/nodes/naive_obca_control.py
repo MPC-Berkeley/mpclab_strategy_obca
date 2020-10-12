@@ -5,7 +5,7 @@ import numpy as np
 from barc.msg import ECU, States, Prediction
 
 from mpclab_strategy_obca.control.OBCAController import NaiveOBCAController
-from mpclab_strategy_obca.control.safety_controller import safetyController
+from mpclab_strategy_obca.control.safety_controller import safetyController, emergencyController
 from mpclab_strategy_obca.control.utils.types import strategyOBCAParams
 
 from mpclab_strategy_obca.dynamics.dynamicsModels import bike_dynamics_rk4
@@ -53,11 +53,13 @@ class strategyOBCAControlNode(object):
         self.L_f = rospy.get_param('controller/dynamics/L_f')
         self.M = rospy.get_param('controller/dynamics/M')
 
-        self.car_L = rospy.get_param('car/plot/L')
-        self.car_W = rospy.get_param('car/plot/W')
+        self.EV_L = rospy.get_param('car/plot/L')
+        self.EV_W = rospy.get_param('car/plot/W')
+        self.TV_L = rospy.get_param('/barc_2/car/plot/L')
+        self.TV_W = rospy.get_param('/barc_2/car/plot/W')
 
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
-        dynamics = bike_dynamics_rk4(dyn_params)
+        self.dynamics = bike_dynamics_rk4(dyn_params)
 
         obca_params = strategyOBCAParams(dt=self.dt, N=self.N, n=self.n_x, d=self.n_u,
             n_obs=self.n_obs, n_ineq=self.n_ineq, d_ineq=self.d_ineq,
@@ -65,7 +67,7 @@ class strategyOBCAControlNode(object):
             u_l=np.array([self.steer_min,self.accel_min]), u_u=np.array([self.steer_max,self.accel_max]),
             du_l=np.array([self.dsteer_min,self.daccel_min]), du_u=np.array([self.dsteer_max,self.daccel_max]),
             optlevel=self.optlevel)
-        controller = NaiveOBCAController(dynamics, obca_params)
+        self.obca_controller = NaiveOBCAController(dynamics, obca_params)
 
         safety_params = safetyParams(dt=self.dt,
             P_accel=self.P_accel, I_accel=self.I_accel, D_accel=self.D_accel,
@@ -74,7 +76,16 @@ class strategyOBCAControlNode(object):
             daccel_max=self.daccel_max, daccel_min=self.daccel_min,
             speed_max=self.speed_max, speed_min=self.speed_min,
             dspeed_max=self.dspeed_max, dspeed_min=self.dspeed_min)
-        safety_controller = safetyController(safety_params)
+        self.safety_controller = safetyController(safety_params)
+
+        emergency_params = safetyParams(dt=self.dt,
+            P_accel=self.P_accel, I_accel=self.I_accel, D_accel=self.D_accel,
+            P_speed=self.P_speed, I_speed=self.I_speed, D_speed=self.D_speed,
+            accel_max=self.accel_max, accel_min=self.accel_min,
+            daccel_max=self.daccel_max, daccel_min=self.daccel_min,
+            speed_max=self.speed_max, speed_min=self.speed_min,
+            dspeed_max=self.dspeed_max, dspeed_min=self.dspeed_min)
+        self.emergency_controller = emergencyController(emergency_params)
 
         self.obs = [[] for _ in range(self.n_obs)]
         for i in range(self.N+1):
@@ -84,9 +95,12 @@ class strategyOBCAControlNode(object):
 
         self.state = np.zeros(self.n_x)
         self.last_state = np.zeros(self.n_x)
-        self.tv_prediction = np.zeros(self.N+1,self.n_x)
+        self.tv_state_prediction = np.zeros(self.N+1,self.n_x)
         self.input = np.zeros(self.n_u)
         self.last_input = np.zeros(self.n_u)
+        self.ev_state_prediction = None
+        self.ev_input_prediction = None
+
 
         rospy.Subscriber('est_states', States, self.estimator_callback, queue_size=1)
         rospy.Subscriber('tv_prediction', Prediction, self.prediction_callback, queue_size=1)
@@ -103,11 +117,13 @@ class strategyOBCAControlNode(object):
 
         self.start_time = 0
 
+        self.rate = rospy.Rate(1.0/self.dt)
+
     def estimator_callback(self, msg):
         self.state = np.array([msg.x, msg.y, msg.psi, np.sign(msg.v_x)*np.sqrt(msg.v_x**2+msg.v_y**2]))
 
     def prediction_callback(self, msg):
-        self.tv_prediction = np.vstack((msg.x, msg.y, msg.psi, msg.v)).T
+        self.tv_state_prediction = np.vstack((msg.x, msg.y, msg.psi, msg.v)).T
 
     def spin(self):
         rospy.sleep(self.init_time)
@@ -126,21 +142,66 @@ class strategyOBCAControlNode(object):
                 rospy.signal_shutdown('Max time of %g reached, controller shutting down...' % self.max_time)
 
         EV_state = self.state
-        TV_pred = self.tv_prediction
+        TV_pred = self.tv_state_prediction
 
         EV_x, EV_y, EV_heading, EV_v = EV_state
+        TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
 
-        x_ref = EV_x + np.arange(self.N+1)*self.dt*self.v_ref
-        z_ref = np.zeros((self.N+1,self.n_x))
-        z_ref[:,0] = x_ref
+        X_ref = EV_x + np.arange(self.N+1)*self.dt*self.v_ref
+        Z_ref = np.zeros((self.N+1, self.n_x))
+        Z_ref[:,0] = X_ref
 
-        tv_obs = get_car_poly(TV_pred, self.car_W, self.car_L)
+        self.obs[0] = get_car_poly(TV_pred, self.TV_W, self.TV_L)
 
+        if self.ev_state_prediction is None:
+            Z_ws = Z_ref
+            U_ws = np.zeros((self.N, self.n_u))
+        else:
+            Z_ws = np.vstack((self.ev_state_prediction[1:],
+                self.dynamics.f_dt(self.ev_state_prediction[-1], self.ev_input_prediction[-1], type='numpy')))
+            U_ws = np.vstack((self.ev_input_prediction[1:],
+                self.ev_input_prediction[-1]))
+
+        obca_mpc_ebrake = False
+        obca_mpc_safety = False
+        status_ws = self.obca_controller.solve_ws(Z_ws, U_ws, self.obs)
+        if status_ws['success']:
+            rospy.loginfo('Warm start solved in %g' % status_ws['solve_time'])
+            Z_obca, U_obca, status_sol = self.obca_controller.solve(EV_state, self.last_input, Z_ref, self.obs)
+
+        if not status_ws['success'] or not status_sol['success']:
+            obca_mpc_safety = True
+            ospy.loginfo('OBCA MPC not feasible, activating safety controller')
+
+        if obca_mpc_safety:
+            safety_control.set_accel_ref(TV_v*np.cos(TV_heading))
+            u_safe = safety_control.solve(EV_state, TV_pred, self.last_input)
+
+            z_next = self.dynamics.f_dt(EV_state, u_safe, type='numpy')
+            collision = check_collision_poly(z_next, (self.EV_W, self.EV_L), TV_pred[1], (self.EV_W, self.EV_L))
+            if collision:
+                obca_mpc_ebrake = True
+                u_safe = emergency_control.solve(EV_state, TV_pred, self.last_input)
+
+            U_pred = np.vstack((u_safe, np.zeros((self.N-1, self.n_u))))
+            Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))
+            for i in range(self.N):
+                Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
+        else:
+            Z_pred, U_pred = Z_obca, U_obca
+
+        self.ev_state_prediction = Z_pred
+        self.ev_input_prediction = U_pred
+
+        ecu_msg = ECU()
+        ecu_msg.servo = U_pred[0,0]
+        ecu_msg.motor = U_pred[0,1]
+        self.ecu_pub.publish(ecu_msg)
+
+        self.rate.sleep()
 
 if __name__ == '__main__':
     rospy.init_node('strategy_obca_control')
-    loop_rate = 1.0/self.dt
-    rate = rospy.Rate(loop_rate)
 
     strategy_obca_node = strategyOBCAControlNode()
     try:

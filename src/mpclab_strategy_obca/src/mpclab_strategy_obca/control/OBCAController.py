@@ -68,11 +68,18 @@ class StrategyOBCAController(abstractController):
 			self.ws_solver = forcespro.nlp.Solver.from_directory('/path/to/solver')
 			self.opt_solver = forcespro.nlp.Solver.from_directory('/path/to/solver')
 
-	def solve(self):
-		pass
+	def solve(self, z, u_prev, Z_ref, obs):
+		Z_obca = np.zeros((self.N+1, self.n_x))
+		U_obca = np.zeros((self.N, self.n_u))
 
-	def solve_ws(self, z, u, obs):
-		pass
+		solve_status = {'success': True, 'solve_time': 1}
+
+		return Z_obca, U_obca, solve_status
+
+	def solve_ws(self, Z, U, obs):
+		solve_status = {'success': True, 'solve_time': 1}
+
+		return solve_status
 
 	def generate_ws_solver(self):
 		ws_model = forcespro.nlp.SymbolicModel()
@@ -442,8 +449,18 @@ class NaiveOBCAController(abstractController):
 	def initialize(self):
 		pass
 
-	def solve(self):
-		return np.zeros(self.n_u)
+	def solve(self, z, u_prev, Z_ref, obs):
+		Z_obca = np.zeros((self.N+1, self.n_x))
+		U_obca = np.zeros((self.N, self.n_u))
+
+		solve_status = {'success': True, 'solve_time': 1}
+
+		return Z_obca, U_obca, solve_status
+
+	def solve_ws(self, Z, U, obs):
+		solve_status = {'success': True, 'solve_time': 1}
+
+		return solve_status
 
 
 def main():
