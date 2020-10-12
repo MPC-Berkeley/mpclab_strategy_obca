@@ -63,16 +63,121 @@ class StrategyOBCAController(abstractController):
 
 		if regen:
 			self.ws_solver = self.generate_ws_solver()
-			self.opt_solver = self.generate_opt_solver()
+			# self.opt_solver = self.generate_opt_solver()
 		else:
-			self.ws_solver = forcespro.nlp.Solver.from_directory('/path/to/solver')
-			self.opt_solver = forcespro.nlp.Solver.from_directory('/path/to/solver')
+			# self.ws_solver = forcespro.nlp.Solver.from_directory('./FP_ws_solver_strat2')
+			self.ws_solver = forcespro.nlp.Solver.from_directory('./%s' % self.ws_name)
+			# self.opt_solver = forcespro.nlp.Solver.from_directory('/%s' % self.opt_name)
 
-	def solve(self):
-		pass
+	def solve(self, z_s, u_prev, z_ref, obs):
+		x0 = []
+		params = []
+
+		for k in range(self.N+1):
+			obs_A = []
+			obs_b = []
+			for i in range(self.n_obs):
+				obs_A.append( obs[k][i]["A"].reshape(-1) )
+				obs_b.append( obs[k][i]["b"].reshape(-1) )
+
+			params.append( z_ref[k, :] )
+			params.append( np.hstack( obs_A ) )
+			params.append( np.hstack( obs_b ) )
+
+			if k == self.N:
+				x0.append( self.z_ws[k, :] )
+				x0.append( self.lambda_ws[self.N-1, :] )
+				x0.append( self.mu_ws[self.N-1, :] )
+			else:
+				x0.append( self.z_ws[k, :] )
+				x0.append( self.lambda_ws[k, :] )
+				x0.append( self.mu_ws[k, :] )
+				x0.append( self.u_ws[k, :] )
+				x0.append( self.u_ws[k, :] )
+
+		problem = {"x0": np.hstack(x0), 
+					"all_parameters": np.hstack(params), 
+					"xinit": np.hstack([z_s, u_prev])}
+
+		output, exitflag, info = self.opt_solver.solve(problem)
+
+		if exitflag == 1:
+			print("FORCES took %d iterations and %f seconds to solve the problem." % (info.it,info.solvetime))
+			status = {"success": True,
+						"return_status": "Successfully Solved", 
+						"solve_time": info.solvetime, 
+						"info": info}
+		else:
+			print("Solving Failed, exitflag = %d\n" % exitflag)
+			status = {"success": False,
+						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
+						"solve_time": None, 
+						"info": info}
+
+		z_pred = np.zeros((self.N+1, self.n_x))
+		u_pred = np.zeros((self.N, self.n_u))
+
+		for k in range(self.N):
+			sol = output["x%02d" % (k+1)]
+			z_pred[k, :] = sol[:self.n_x]
+			u_prev[k, :] = sol[self.n_x + self.N_ineq + self.M_ineq : self.n_x + self.N_ineq + self.M_ineq + self.n_u]
+		
+		sol = output["x%02d" % (self.N+1)]
+		z_pred[self.N, :] = sol[:self.n_x]
+
+		return z_pred, u_pred, status
 
 	def solve_ws(self, z, u, obs):
-		pass
+		self.z_ws = z
+		self.u_ws = u
+
+		x0 = np.zeros((self.N_ineq + self.M_ineq + self.n_obs )*(self.N + 1))
+		params = []
+		for k in range(self.N+1):
+			obs_A = []
+			obs_b = []
+			for i in range(self.n_obs):
+				obs_A.append( obs[k][i]["A"].reshape(-1) )
+				obs_b.append( obs[k][i]["b"].reshape(-1) )
+
+			params.append( z[k, :] )
+			params.append( np.hstack( obs_A ) )
+			params.append( np.hstack( obs_b ) )
+
+		problem = {"x0": x0, 
+					"all_parameters": np.hstack(params)}
+
+		output, exitflag, info = self.ws_solver.solve(problem)
+
+		if exitflag == 1:
+			print("FORCES took %d iterations and %f seconds to solve the problem.\n" %(info.it, info.solvetime) )
+			status = {"success": True,
+						"return_status": "Successfully Solved", 
+						"solve_time": info.solvetime}
+			
+			l_ws = np.zeros((self.N+1, self.N_ineq))
+			m_ws = np.zeros((self.N+1, self.M_ineq))
+
+			for k in range(self.N+1):
+				sol = output["x%02d" % (k+1)]
+				j = 0
+
+				for i in range(self.n_obs):
+					l_ws[k, j : j+self.n_ineq[i]] = sol[j : j+self.n_ineq[i]]
+					m_ws[k, i*self.m_ineq : (i+1)*self.m_ineq] = sol[self.N_ineq + i*self.m_ineq : self.N_ineq + (i+1)*self.m_ineq]
+
+					j += self.n_ineq[i]
+
+			self.lambda_ws = l_ws
+			self.mu_ws = m_ws
+		else:
+			print("Solving Failed, exitflag = %d\n" % exitflag)
+			status = {"success": False,
+						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
+						"solve_time": None}
+			
+		return status
+
 
 	def generate_ws_solver(self):
 		ws_model = forcespro.nlp.SymbolicModel()
@@ -140,7 +245,7 @@ class StrategyOBCAController(abstractController):
 
 			Lambda = z[ j : j + self.n_ineq[i] ]
 
-			mu = z[ self.N_ineq + (i-1)*self.m_ineq : self.N_ineq + i*self.m_ineq ]
+			mu = z[ self.N_ineq + i*self.m_ineq : self.N_ineq + (i+1)*self.m_ineq ]
 
 			d = z[ self.N_ineq + self.M_ineq + i ]
 
@@ -357,7 +462,7 @@ class StrategyOBCAController(abstractController):
 
 			Lambda = z[ self.n_x + j : self.n_x + j + self.n_ineq[i] ]
 
-			mu = z[ self.n_x + self.N_ineq + (i-1)*self.m_ineq : self.n_x + self.N_ineq + i*self.m_ineq ]
+			mu = z[ self.n_x + self.N_ineq + i*self.m_ineq : self.n_x + self.N_ineq + (i+1)*self.m_ineq ]
 
 			obca.append( ca.mtimes( ca.transpose(self.G), mu) + ca.mtimes( ca.transpose(ca.mtimes(A, R_opt)), Lambda ) )
 			obca_d.append( -ca.dot(self.g, mu) + ca.dot(ca.mtimes(A, t_opt)-b, Lambda) )
@@ -392,7 +497,7 @@ class StrategyOBCAController(abstractController):
 
 			Lambda = z[ self.n_x + j : self.n_x + j + self.n_ineq[i] ]
 
-			mu = z[ self.n_x + self.N_ineq + (i-1)*self.m_ineq : self.n_x + self.N_ineq + i*self.m_ineq ]
+			mu = z[ self.n_x + self.N_ineq + i*self.m_ineq : self.n_x + self.N_ineq + (i+1)*self.m_ineq ]
 
 			obca.append( ca.mtimes( ca.transpose(self.G), mu) + ca.mtimes( ca.transpose(ca.mtimes(A, R_opt)), Lambda ) )
 			obca_d.append( -ca.dot(self.g, mu) + ca.dot(ca.mtimes(A, t_opt)-b, Lambda) )
@@ -410,10 +515,28 @@ class NaiveOBCAController(abstractController):
 		pass
 
 
-def main():
+def main():	
 	dynamics = bike_dynamics_rk4()
-	controller = obca_controller(dynamics)
-	controller.initialize(regen=True)
+	controller = StrategyOBCAController(dynamics)
+	controller.initialize(regen=False)
+
+	# Generate fake obs to test the ws solver
+	obs = []
+	for i in range(3):
+		obs_k = []
+		if i == 1:
+			for _ in range(21):
+				obs_k.append( {"A": np.zeros((4,2)), "b": np.zeros((4,1))} )
+		else:
+			for _ in range(21):
+				obs_k.append( {"A": np.zeros(2), "b": np.zeros(1)} )
+
+		obs.append(obs_k)
+
+	z_ws = np.zeros((4, 21))
+	u_ws = np.zeros((2, 20))
+	
+	controller.solve_ws(z_ws, u_ws, obs)
 
 if __name__ == '__main__':
 	main()
