@@ -3,8 +3,8 @@
 import numpy as np
 from scipy.linalg import block_diag, sqrtm
 import casadi as ca
-import forcespro
-import forcespro.nlp
+# import forcespro
+# import forcespro.nlp
 
 from mpclab_strategy_obca.control.abstractController import abstractController
 
@@ -95,8 +95,8 @@ class StrategyOBCAController(abstractController):
 				x0.append( self.u_ws[k, :] )
 				x0.append( self.u_ws[k, :] )
 
-		problem = {"x0": np.hstack(x0), 
-					"all_parameters": np.hstack(params), 
+		problem = {"x0": np.hstack(x0),
+					"all_parameters": np.hstack(params),
 					"xinit": np.hstack([z_s, u_prev])}
 
 		output, exitflag, info = self.opt_solver.solve(problem)
@@ -104,14 +104,14 @@ class StrategyOBCAController(abstractController):
 		if exitflag == 1:
 			print("FORCES took %d iterations and %f seconds to solve the problem." % (info.it,info.solvetime))
 			status = {"success": True,
-						"return_status": "Successfully Solved", 
-						"solve_time": info.solvetime, 
+						"return_status": "Successfully Solved",
+						"solve_time": info.solvetime,
 						"info": info}
 		else:
 			print("Solving Failed, exitflag = %d\n" % exitflag)
 			status = {"success": False,
 						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
-						"solve_time": None, 
+						"solve_time": None,
 						"info": info}
 
 		z_pred = np.zeros((self.N+1, self.n_x))
@@ -121,7 +121,7 @@ class StrategyOBCAController(abstractController):
 			sol = output["x%02d" % (k+1)]
 			z_pred[k, :] = sol[:self.n_x]
 			u_prev[k, :] = sol[self.n_x + self.N_ineq + self.M_ineq : self.n_x + self.N_ineq + self.M_ineq + self.n_u]
-		
+
 		sol = output["x%02d" % (self.N+1)]
 		z_pred[self.N, :] = sol[:self.n_x]
 
@@ -144,7 +144,7 @@ class StrategyOBCAController(abstractController):
 			params.append( np.hstack( obs_A ) )
 			params.append( np.hstack( obs_b ) )
 
-		problem = {"x0": x0, 
+		problem = {"x0": x0,
 					"all_parameters": np.hstack(params)}
 
 		output, exitflag, info = self.ws_solver.solve(problem)
@@ -152,9 +152,9 @@ class StrategyOBCAController(abstractController):
 		if exitflag == 1:
 			print("FORCES took %d iterations and %f seconds to solve the problem.\n" %(info.it, info.solvetime) )
 			status = {"success": True,
-						"return_status": "Successfully Solved", 
+						"return_status": "Successfully Solved",
 						"solve_time": info.solvetime}
-			
+
 			l_ws = np.zeros((self.N+1, self.N_ineq))
 			m_ws = np.zeros((self.N+1, self.M_ineq))
 
@@ -175,7 +175,7 @@ class StrategyOBCAController(abstractController):
 			status = {"success": False,
 						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
 						"solve_time": None}
-			
+
 		return status
 
 
@@ -511,7 +511,7 @@ class StrategyOBCAController(abstractController):
 		return opt_ineq
 
 class NaiveOBCAController(abstractController):
-	def __init__(self):
+	def __init__(self, dynamics, params=strategyOBCAParams()):
 		self.dynamics = dynamics
 
 		self.dt = params.dt
@@ -561,7 +561,7 @@ class NaiveOBCAController(abstractController):
 		return solve_status
 
 
-def main():	
+def main():
 	dynamics = bike_dynamics_rk4()
 	controller = StrategyOBCAController(dynamics)
 	controller.initialize(regen=False)
@@ -581,7 +581,7 @@ def main():
 
 	z_ws = np.zeros((4, 21))
 	u_ws = np.zeros((2, 20))
-	
+
 	controller.solve_ws(z_ws, u_ws, obs)
 
 if __name__ == '__main__':

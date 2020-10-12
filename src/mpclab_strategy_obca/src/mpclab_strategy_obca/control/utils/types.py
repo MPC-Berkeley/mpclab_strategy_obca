@@ -34,9 +34,9 @@ class safetyParams(PythonMsg):
     I_accel: float = field(default=0.0)
     D_accel: float = field(default=0.0)
 
-    P_speed: float = field(default=1.0)
-    I_speed: float = field(default=0.0)
-    D_speed: float = field(default=0.0)
+    P_steer: float = field(default=1.0)
+    I_steer: float = field(default=0.0)
+    D_steer: float = field(default=0.0)
 
     accel_int_e_max: float = field(default=100)
     accel_int_e_min: float = field(default=-100)
@@ -45,12 +45,12 @@ class safetyParams(PythonMsg):
     daccel_max: float = field(default=None)
     daccel_min: float = field(default=None)
 
-    speed_int_e_max: float = field(default=100)
-    speed_int_e_min: float = field(default=-100)
-    speed_max: float = field(default=None)
-    speed_min: float = field(default=None)
-    dspeed_max: float = field(default=None)
-    dspeed_min: float = field(default=None)
+    steer_int_e_max: float = field(default=100)
+    steer_int_e_min: float = field(default=-100)
+    steer_max: float = field(default=None)
+    steer_min: float = field(default=None)
+    dsteer_max: float = field(default=None)
+    dsteer_min: float = field(default=None)
 
 @dataclass
 class strategyOBCAParams(PythonMsg):

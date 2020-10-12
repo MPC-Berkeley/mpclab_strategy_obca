@@ -13,10 +13,10 @@ class safetyController(abstractController):
             u_max=params.accel_max, u_min=params.accel_min,
             du_max=params.daccel_max, du_min=params.daccel_min)
         self.steer_pid_params = PIDParams(dt=params.dt,
-            Kp=params.P_speed, Ki=params.I_speed, Kd=params.D_speed,
-            int_e_max=params.speed_int_e_max, int_e_min=params.speed_int_e_min,
-            u_max=params.speed_max, u_min=params.speed_min,
-            du_max=params.dspeed_max, du_min=params.dspeed_min)
+            Kp=params.P_steer, Ki=params.I_steer, Kd=params.D_steer,
+            int_e_max=params.steer_int_e_max, int_e_min=params.steer_int_e_min,
+            u_max=params.steer_max, u_min=params.steer_min,
+            du_max=params.dsteer_max, du_min=params.dsteer_min)
 
         self.accel_ref = 0
         self.steer_ref = 0
@@ -62,10 +62,10 @@ class emergencyController(abstractController):
             u_max=params.accel_max, u_min=params.accel_min,
             du_max=params.daccel_max, du_min=params.daccel_min)
         self.steer_pid_params = PIDParams(dt=params.dt,
-            Kp=params.P_speed, Ki=params.I_speed, Kd=params.D_speed,
-            int_e_max=params.speed_int_e_max, int_e_min=params.speed_int_e_min,
-            u_max=params.speed_max, u_min=params.speed_min,
-            du_max=params.dspeed_max, du_min=params.dspeed_min)
+            Kp=params.P_steer, Ki=params.I_steer, Kd=params.D_steer,
+            int_e_max=params.steer_int_e_max, int_e_min=params.steer_int_e_min,
+            u_max=params.steer_max, u_min=params.steer_min,
+            du_max=params.dsteer_max, du_min=params.dsteer_min)
 
         self.accel_ref = 0
         self.steer_ref = 0

@@ -25,15 +25,15 @@ class bike_dynamics_rk4(object):
 							x[3]*ca.sin(beta(u[0])) / self.L_r,
 							u[1] ])
 		elif type == 'numpy':
-			beta = lambda d: np.atan2(self.L_r * np.tan(d), self.L_r + self.L_f)
+			beta = lambda d: np.arctan2(self.L_r * np.tan(d), self.L_r + self.L_f)
 
-			x_dot = np.array([x[3]*np.cos(x[2] + np.beta(u[0])),
+			x_dot = np.array([x[3]*np.cos(x[2] + beta(u[0])),
 							x[3]*np.sin(x[2] + beta(u[0])),
 							x[3]*np.sin(beta(u[0])) / self.L_r,
 							u[1]])
 		else:
 			raise RuntimeError('Dynamics type %s not recognized' % type)
-			
+
 		return x_dot
 
 	def f_dt(self, x_k, u_k, type='casadi'):
