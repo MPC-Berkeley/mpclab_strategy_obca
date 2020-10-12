@@ -13,3 +13,7 @@ To use the controllers in this package, navigate to the root directory of this r
 source ./devel/setup.bash --extend
 ```
 The `--extend` flag stops overwriting from sourcing the `setup.bash` from this package.
+
+Dependencies:
+- APT: `libgmp3-dev` (required for `pypoman`)
+- Python: `numpy`, `scipy`, `torch`, `pypoman`, `casadi==3.5.1`, [`forcespro`](https://forces.embotech.com/Documentation/installation/python.html)

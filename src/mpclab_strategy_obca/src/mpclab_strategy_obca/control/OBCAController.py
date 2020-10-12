@@ -512,7 +512,53 @@ class StrategyOBCAController(abstractController):
 
 class NaiveOBCAController(abstractController):
 	def __init__(self):
+		self.dynamics = dynamics
+
+		self.dt = params.dt
+
+		self.n_x = params.n
+		self.n_u = params.d
+
+		self.N = params.N
+
+		self.n_obs = params.n_obs
+		self.n_ineq = params.n_ineq # Number of constraints for each obstacle
+		self.d_ineq = params.d_ineq # Dimension of constraints for all obstacles
+
+		self.G = params.G
+		self.g = params.g
+		self.m_ineq = self.G.shape[0] # Number of constraints for controlled object
+
+		self.Q = params.Q
+		self.R = params.R
+
+		self.d_min = params.d_min
+
+		self.u_l = params.u_l
+		self.u_u = params.u_u
+		self.du_l = params.du_l
+		self.du_u = params.du_u
+
+		self.N_ineq = np.sum(self.n_ineq)
+		self.M_ineq = self.n_obs * self.m_ineq
+
+		self.optlevel = params.optlevel
+
+	def initialize(self):
 		pass
+
+	def solve(self, z, u_prev, Z_ref, obs):
+		Z_obca = np.zeros((self.N+1, self.n_x))
+		U_obca = np.zeros((self.N, self.n_u))
+
+		solve_status = {'success': True, 'solve_time': 1}
+
+		return Z_obca, U_obca, solve_status
+
+	def solve_ws(self, Z, U, obs):
+		solve_status = {'success': True, 'solve_time': 1}
+
+		return solve_status
 
 
 def main():	
