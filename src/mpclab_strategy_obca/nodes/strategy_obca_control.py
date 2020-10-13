@@ -89,7 +89,8 @@ class strategyOBCAControlNode(object):
             du_l=np.array([self.dsteer_min,self.daccel_min]), du_u=np.array([self.dsteer_max,self.daccel_max]),
             optlevel=self.optlevel)
         self.obca_controller = StrategyOBCAController(self.dynamics, obca_params)
-
+        self.obca_controller.initialize(regen=False)
+        
         safety_params = safetyParams(dt=self.dt,
             P_accel=self.P_accel, I_accel=self.I_accel, D_accel=self.D_accel,
             P_steer=self.P_steer, I_steer=self.I_steer, D_steer=self.D_steer,

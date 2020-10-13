@@ -73,6 +73,7 @@ class naiveOBCAControlNode(object):
             du_l=np.array([self.dsteer_min,self.daccel_min]), du_u=np.array([self.dsteer_max,self.daccel_max]),
             optlevel=self.optlevel)
         self.obca_controller = NaiveOBCAController(self.dynamics, obca_params)
+        self.obca_controller.initialize(regen=False)
 
         safety_params = safetyParams(dt=self.dt,
             P_accel=self.P_accel, I_accel=self.I_accel, D_accel=self.D_accel,
@@ -95,8 +96,8 @@ class naiveOBCAControlNode(object):
         self.obs = [[] for _ in range(self.n_obs)]
         for i in range(self.N+1):
             # Add lane constraints to end of obstacle list
-            self.obs[-2].append({'A': np.array([0,-1]).reshape((-1,1)), 'b': -self.lanewidth/2})
-            self.obs[-1].append({'A': np.array([0,1]).reshape((-1,1)), 'b': -self.lanewidth/2})
+            self.obs[-2].append({'A': np.array([0,-1]).reshape((-1,1)), 'b': np.array([-self.lanewidth/2])})
+            self.obs[-1].append({'A': np.array([0,1]).reshape((-1,1)), 'b': np.array([-self.lanewidth/2])})
 
         self.state = np.zeros(self.n_x)
         self.last_state = np.zeros(self.n_x)
@@ -179,14 +180,14 @@ class naiveOBCAControlNode(object):
                 rospy.loginfo('OBCA MPC not feasible, activating safety controller')
 
             if obca_mpc_safety:
-                safety_control.set_accel_ref(TV_v*np.cos(TV_heading))
-                u_safe = safety_control.solve(EV_state, TV_pred, self.last_input)
+                self.safety_controller.set_accel_ref(EV_v*np.cos(EV_heading), TV_v*np.cos(TV_heading))
+                u_safe = self.safety_controller.solve(EV_state, TV_pred, self.last_input)
 
                 z_next = self.dynamics.f_dt(EV_state, u_safe, type='numpy')
                 collision = check_collision_poly(z_next, (self.EV_W, self.EV_L), TV_pred[1], (self.EV_W, self.EV_L))
                 if collision:
                     obca_mpc_ebrake = True
-                    u_safe = emergency_control.solve(EV_state, TV_pred, self.last_input)
+                    u_safe = self.emergency_controller.solve(EV_state, TV_pred, self.last_input)
 
                 U_pred = np.vstack((u_safe, np.zeros((self.N-1, self.n_u))))
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))

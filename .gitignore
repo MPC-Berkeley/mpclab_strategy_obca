@@ -55,3 +55,8 @@ CATKIN_IGNORE
 
 *.mat
 *.mat*
+
+*Zone.Identifier
+*simulink*
+*.mdl
+*.jpg

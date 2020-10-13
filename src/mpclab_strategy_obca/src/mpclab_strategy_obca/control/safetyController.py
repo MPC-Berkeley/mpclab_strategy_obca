@@ -45,13 +45,13 @@ class safetyController(abstractController):
 
         return u
 
-    def set_accel_ref(self, accel_ref):
+    def set_accel_ref(self, accel, accel_ref):
         self.accel_ref = accel_ref
-        self.accel_pid.set_x_ref(self.accel_ref)
+        self.accel_pid.set_x_ref(accel, accel_ref)
 
-    def set_steer_ref(self, steer_ref):
+    def set_steer_ref(self, steer, steer_ref):
         self.steer_ref = steer_ref
-        self.steer_pid.set_x_ref(self.steer_ref)
+        self.steer_pid.set_x_ref(steer, steer_ref)
 
 class emergencyController(abstractController):
 
@@ -94,13 +94,13 @@ class emergencyController(abstractController):
 
         return u
 
-    def set_accel_ref(self, accel_ref):
+    def set_accel_ref(self, accel, accel_ref):
         self.accel_ref = accel_ref
-        self.accel_pid.set_x_ref(self.accel_ref)
+        self.accel_pid.set_x_ref(accel, accel_ref)
 
-    def set_steer_ref(self, steer_ref):
+    def set_steer_ref(self, steer, steer_ref):
         self.steer_ref = steer_ref
-        self.steer_pid.set_x_ref(self.steer_ref)
+        self.steer_pid.set_x_ref(steer, steer_ref)
 
 if __name__ == '__main__':
     import numpy as np

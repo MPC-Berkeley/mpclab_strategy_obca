@@ -140,7 +140,7 @@ class PID(abstractController):
     def _saturate_rel_high(self, du):
         return np.minimum(du, self.du_max)
 
-    def _saturate_rel_low(self, u):
+    def _saturate_rel_low(self, du):
         return np.maximum(du, self.du_min)
 
 # Test script to ensure controller object is functioning properly
