@@ -142,8 +142,8 @@ class naiveOBCAControlNode(object):
                 # Publish the final motor and steering commands
                 self.ecu_pub.publish(ecu_msg)
 
-                # self.bond_log.break_bond()
-                # self.bond_ard.break_bond()
+                self.bond_log.break_bond()
+                self.bond_ard.break_bond()
                 rospy.signal_shutdown('Max time of %g reached, controller shutting down...' % self.max_time)
 
             EV_state = self.state

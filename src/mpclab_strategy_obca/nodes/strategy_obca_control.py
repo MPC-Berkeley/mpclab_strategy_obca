@@ -18,8 +18,10 @@ from mpclab_strategy_obca.constraint_generation.hyperplaneConstraintGenerator im
 from mpclab_strategy_obca.dynamics.dynamicsModels import bike_dynamics_rk4
 from mpclab_strategy_obca.dynamics.utils.types import dynamicsKinBikeParams
 
-from mpclab_strategy_obca.utils.types import experimentParams
-from mpclab_strategy_obca.utils.utils import get_car_poly, check_collision_poly
+from mpclab_strategy_obca.state_machine.stateMachine import stateMachine
+
+from mpclab_strategy_obca.utils.types import experimentParams, experimentStates
+from mpclab_strategy_obca.utils.utils import get_car_poly, check_collision_poly, scale_state
 
 class strategyOBCAControlNode(object):
     def __init__(self):
@@ -51,6 +53,14 @@ class strategyOBCAControlNode(object):
         self.R = np.diag(rospy.get_param('controller/obca/R'))
         self.optlevel = rospy.get_param('controller/obca/optlevel')
 
+        self.nn_model_file = rospy.get_param('controller/obca/nn_model_file')
+        self.smooth_prediction = rospy.get_param('controller/obca/smooth_prediction')
+        self.W_kf = eval(rospy.get_param('controller/obca/W_kf'))
+        self.V_kf = eval(rospy.get_param('controller/obca/V_kf'))
+        self.Pm_kf = eval(rospy.get_param('controller/obca/Pm_kf'))
+        self.A_kf = eval(rospy.get_param('controller/obca/A_kf'))
+        self.H_kf = eval(rospy.get_param('controller/obca/H_kf'))
+
         self.P_accel = rospy.get_param('controller/safety/P_accel')
         self.I_accel = rospy.get_param('controller/safety/I_accel')
         self.D_accel = rospy.get_param('controller/safety/D_accel')
@@ -78,7 +88,7 @@ class strategyOBCAControlNode(object):
             u_l=np.array([self.steer_min,self.accel_min]), u_u=np.array([self.steer_max,self.accel_max]),
             du_l=np.array([self.dsteer_min,self.daccel_min]), du_u=np.array([self.dsteer_max,self.daccel_max]),
             optlevel=self.optlevel)
-        self.obca_controller = NaiveOBCAController(self.dynamics, obca_params)
+        self.obca_controller = StrategyOBCAController(self.dynamics, obca_params)
 
         safety_params = safetyParams(dt=self.dt,
             P_accel=self.P_accel, I_accel=self.I_accel, D_accel=self.D_accel,
@@ -97,6 +107,19 @@ class strategyOBCAControlNode(object):
             steer_max=self.steer_max, steer_min=self.steer_min,
             dsteer_max=self.dsteer_max, dsteer_min=self.dsteer_min)
         self.emergency_controller = emergencyController(emergency_params)
+
+        strategy_params = strategyPredictorParams(nn_model_file=self.nn_model_file, smooth_prediction=self.smooth_prediction,
+            W_kf=self.W_kf, V_kf=self.V_kf, Pm_kf=self.Pm_kf,
+            A_kf=self.A_kf, H_kf=self.H_kf)
+        self.stragegy_predictor = strategyPredictor(strategy_params)
+
+        collision_buffer_r = np.sqrt(self.EV_L**2+self.EV_W**2)
+        a_lim = np.array([self.accel_min, self.accel_max])
+        exp_params = experimentParams(dt=self.dt, car_L=self.EV_L, car_W=self.EV_W,
+            N=self.N, collision_buffer_r=collision_buffer_r,
+            T=self.max_time, T_tv=self.T_tv, lock_steps=self.lock_steps, a_lim=a_lim)
+        self.constraint_generator = hyperplaneConstraintGenerator(exp_params)
+        self.state_machine = stateMachine(exp_params)
 
         self.obs = [[] for _ in range(self.n_obs)]
         for i in range(self.N+1):
@@ -126,6 +149,7 @@ class strategyOBCAControlNode(object):
         self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
 
         self.start_time = 0
+        self.task_finished = False
 
         self.rate = rospy.Rate(1.0/self.dt)
 
@@ -140,17 +164,24 @@ class strategyOBCAControlNode(object):
         self.start_time = rospy.get_rostime().to_sec()
 
         while not rospy.is_shutdown():
-            t = rospy.get_rostime().to_sec()
+            t = rospy.get_rostime().to_sec() - self.start_time
             ecu_msg = ECU()
+
             if t-self.start_time >= self.max_time:
+                end_msg = 'Max time of %g reached, controller shutting down...' % self.max_time
+                self.task_finished = True
+            elif self.state_machine.state == 'End':
+                end_msg = 'Task finished, controller shutting down...'
+                self.task_finished = True
+            if self.task_finished:
                 ecu_msg.servo = 0.0
                 ecu_msg.motor = 0.0
                 # Publish the final motor and steering commands
                 self.ecu_pub.publish(ecu_msg)
 
-                # self.bond_log.break_bond()
-                # self.bond_ard.break_bond()
-                rospy.signal_shutdown('Max time of %g reached, controller shutting down...' % self.max_time)
+                self.bond_log.break_bond()
+                self.bond_ard.break_bond()
+                rospy.signal_shutdown(end_msg)
 
             EV_state = self.state
             TV_pred = self.tv_state_prediction
@@ -158,11 +189,56 @@ class strategyOBCAControlNode(object):
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
 
-            X_ref = EV_x + np.arange(self.N+1)*self.dt*self.v_ref
-            Z_ref = np.zeros((self.N+1, self.n_x))
-            Z_ref[:,0] = X_ref
-
+            # Generate target vehicle obstacle descriptions
             self.obs[0] = get_car_poly(TV_pred, self.TV_W, self.TV_L)
+
+            # Get target vehicle trajectory relative to ego vehicle state
+            if self.state_machine.state in ['Safe-Confidence', 'Safe-Yield', 'Safe-Infeasible'] or EV_v*np.cos(EV_heading) <= 0:
+                rel_state = TV_pred - np.array([EV_x, EV_y, EV_heading, 0, EV_v*np.sin(EV_heading)])
+            else:
+                rel_state = TV_pred - EV_state
+
+            # Scale the relative state
+            # rel_state = scale_state(rel_state, rel_range, scale, bias)
+
+            # Predict strategy to use
+            scores = self.stragegy_predictor.predict(rel_state.flatten())
+
+            exp_state = experimentStates(t=t, EV_curr=EV_state, TV_pred=TV_pred, score=score)
+            self.state_machine.state_transition(exp_state)
+
+            if self.state_machine.state == 'End':
+                continue
+
+            X_ref = EV_x + np.arange(self.N+1)*self.dt*self.v_ref
+            Y_ref = np.zeros(self.N+1)
+            Heading_ref = np.zeros(self.N+1)
+            V_ref = self.v_ref*np.ones(self.N+1)
+            Z_ref = np.vstack((X_ref, Y_ref, Heading_ref, V_ref)).T
+
+            Z_check = Z_ref
+            scale_mult = 1.0
+            scalings = np.maximum(np.ones(self.N+1), scale_mult*np.abs(TV_v)/self.v_ref)
+            collisions = self.constraint_generator.check_collision_points(Z_check, TV_pred, scalings)
+
+            exp_state.ref_col = collisions
+            self.state_machine.state_transition(exp_state)
+
+            # Generate hyperplane constraints
+            hyp = [{'w': np.array([np.sign(Z_check[i,0]),np.sign(Z_check[i,1]),0,0]), 'b': 0, 'pos': None} for i in range(self.N+1)]
+            for i in range(self.N+1):
+                if collisions[i]:
+                    if self.state_machine.strategy == 'Left':
+                        d = np.array([0,1])
+                    elif self.state_machine.strategy == 'Right':
+                        d = np.array([0,-1])
+                    else:
+                        d = np.array([EV_x-TV_pred[i,0],EV_y-TV_pred[i,1]])
+                        d = d/la.norm(d)
+
+                    hyp_xy, hyp_w, hyp_b, _ = self.constraint_generator.generate_constraint(Z_check[i], TV_pred[i], d, scalings[i])
+
+                    hyp[i] = {'w': np.concatenate(hyp_w, np.zeros(2)), 'b': hyp_b, 'pos', hyp_xy}
 
             if self.ev_state_prediction is None:
                 Z_ws = Z_ref
@@ -173,16 +249,21 @@ class strategyOBCAControlNode(object):
                 U_ws = np.vstack((self.ev_input_prediction[1:],
                     self.ev_input_prediction[-1]))
 
-            obca_mpc_ebrake = False
-            obca_mpc_safety = False
+            feasible = False
+            collision = False
+
             status_ws = self.obca_controller.solve_ws(Z_ws, U_ws, self.obs)
             if status_ws['success']:
                 rospy.loginfo('Warm start solved in %g s' % status_ws['solve_time'])
-                Z_obca, U_obca, status_sol = self.obca_controller.solve(EV_state, self.last_input, Z_ref, self.obs)
+                Z_obca, U_obca, status_sol = self.obca_controller.solve(EV_state, self.last_input, Z_ref, self.obs, hyp)
 
-            if not status_ws['success'] or not status_sol['success']:
-                obca_mpc_safety = True
+            if status_ws['success'] and status_sol['success']:
+                feasible = True
+                collision = False
                 rospy.loginfo('OBCA MPC not feasible, activating safety controller')
+
+            exp_state.feas = feasible
+            self.state_machine.state_transition(exp_state)
 
             if obca_mpc_safety:
                 safety_control.set_accel_ref(TV_v*np.cos(TV_heading))

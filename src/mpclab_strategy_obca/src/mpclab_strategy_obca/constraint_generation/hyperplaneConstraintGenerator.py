@@ -55,6 +55,73 @@ class hyperplaneConstraintGenerator(abstractConstraintGenerator):
 
         return hyp_xy, hyp_w, hyp_b, coll_xy
 
+    def check_collision_points(self, global_collision_pos, global_car_state, collision_buffer_scaling=None):
+        N = global_collision_pos.shape[0]
+
+        if collision_buffer_scaling is None:
+            collision_buffer_scaling = np.ones(N)
+
+        collisions = [False for _ in range(N)]
+
+        A = np.vstack((np.eye(2),-np.eye(2)))
+
+        for i in range(N):
+            s = collision_buffer_scaling[i]
+
+            car_x = global_car_state[i,0]
+            car_y = global_car_state[i,1]
+            car_heading = global_car_state[i,2]
+            car_v = global_car_state[i,3]
+
+            car_pos = np.array([car_x, car_y])
+            R = self._get_rotation_matrix(car_heading)
+            car_A = A.dot(R.T)
+            t = car_A.dot(car_pos)
+
+            v_direction = self._sign(car_v)
+            if v_direction > 0:
+                L_p = s*self.L/2
+                L_m = self.L/2
+            else:
+                L_p = self.L/2
+                L_m = s*self.L/2
+
+            body_b = np.array([L_p, self.W/2, L_m, self.W/2])
+            front_b = np.array([L_p+self.r, self.W/2, -L_p, self.W/2])
+            back_b = np.array([-L_m, self.W/2, L_m+self.r, self.W/2])
+            left_b = np.array([L_p, self.W/2+self.r, L_m, -self.W/2])
+            right_b = np.array([L_p, -self.W/2, L_m, self.W/2+self.r])
+
+            fl = np.array([L_p, self.W/2])
+            fr = np.array([L_p, -self.W/2])
+            bl = np.array([-L_m, self.W/2])
+            br = np.array([-L_m, -self.W/2])
+
+            car_body_b = body_b + t
+            car_front_b = front_b + t
+            car_back_b = back_b + t
+            car_left_b = left_b + t
+            car_right_b = right_b + t
+
+            car_fl = R.dot(fl) + car_pos
+            car_fr = R.dot(fr) + car_pos
+            car_bl = R.dot(bl) + car_pos
+            car_br = R.dot(br) + car_pos
+
+            z = car_A.dot(global_collision_pos[i])
+            if np.all(z-car_body_b <= 0) or \
+                np.all(z-car_front_b <= 0) or \
+                np.all(z-car_back_b <= 0) or \
+                np.all(z-car_left_b <= 0) or \
+                np.all(z-car_right_b <= 0) or \
+                (la.norm(global_collision_pos[i]-car_fl) <= self.r) or \
+                (la.norm(global_collision_pos[i]-car_fr) <= self.r) or \
+                (la.norm(global_collision_pos[i]-car_bl) <= self.r) or \
+                (la.norm(global_collision_pos[i]-car_br) <= self.r):
+                collisions[i] =True
+
+        return collisions
+
     def _project_to_car_edge(self, pos, projection_angle):
         x, y, phi = pos[0], pos[1], projection_angle
 
@@ -294,7 +361,7 @@ if __name__ == '__main__':
     import matplotlib.patches as patches
     from matplotlib.transforms import Affine2D
     import pdb
-
+    import time
 
     L, W, r = 4.0, 1.5, 1.0
     params = experimentParams(car_L=L, car_W=W, collision_buffer_r=r)
@@ -302,7 +369,7 @@ if __name__ == '__main__':
 
     coll_pos = np.array([1, 0.5])
 
-    car_x, car_y, car_heading, car_v = 0, 0, 5*np.pi/6, 1
+    car_x, car_y, car_heading, car_v = 0, 0, 5*np.pi/4, 1
     car_state = np.array([car_x,car_y,car_heading,car_v])
 
     proj_dir = np.array([0,1])
@@ -319,6 +386,12 @@ if __name__ == '__main__':
         _, _, _, xy = hyp_gen.generate_constraint(np.zeros(2), car_state, d, scaling)
         bound_x.append(xy[0])
         bound_y.append(xy[1])
+
+    test_pts = np.vstack((np.linspace(-4, 4, 20), -2*np.ones(20))).T
+    # test_pts = np.vstack((np.linspace(-4, 4, 20), np.ones(20))).T
+    t_s = time.time()
+    collisions = hyp_gen.check_collision_points(test_pts, np.tile(car_state, (20,1)), scaling*np.ones(20))
+    print(time.time() - t_s)
 
     fig = plt.figure()
     ax = fig.gca()
@@ -342,6 +415,11 @@ if __name__ == '__main__':
     ax.plot(hyp_xy[0], hyp_xy[1], 'go')
     ax.plot(plot_x, plot_y, 'g')
     ax.plot(bound_x, bound_y, 'b')
+    for i in range(test_pts.shape[0]):
+        if collisions[i]:
+            ax.plot(test_pts[i,0], test_pts[i,1], 'ro')
+        else:
+            ax.plot(test_pts[i,0], test_pts[i,1], 'go')
 
     plt.show(block=False)
     plt.draw()

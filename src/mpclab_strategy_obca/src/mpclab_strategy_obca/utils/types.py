@@ -29,9 +29,9 @@ class experimentParams(PythonMsg):
 
     lock_steps: int = field(default=20)
 
-    strategy_names: list = field(default=["Left", "Right", "Yield"])
+    strategy_names: tuple = field(default=("Left", "Right", "Yield"))
 
-    a_lim: np.array = field(default=np.array([-2.5, -8]))
+    a_lim: np.array = field(default=np.array([-8.0, 2.5]))
 
 @dataclass
 class experimentStates(PythonMsg):

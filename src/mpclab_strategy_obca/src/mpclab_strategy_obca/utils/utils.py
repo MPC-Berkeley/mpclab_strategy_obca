@@ -49,6 +49,9 @@ def get_car_verts(z, W, L):
     V = np.vstack((V_x, V_y)).T
     return V
 
+def scale_state(x, x_range, scale, bias):
+    return np.multiply(np.divide(x - x_range[0], x_range[1]-x_range[0]), scale) + bias
+
 if __name__ == '__main__':
     W = 2
     L = 4
