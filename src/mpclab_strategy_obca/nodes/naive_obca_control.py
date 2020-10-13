@@ -1,3 +1,5 @@
+#!/usr/bin python3
+
 import rospy
 from bondpy import bondpy
 import numpy as np
@@ -11,12 +13,12 @@ from mpclab_strategy_obca.control.utils.types import strategyOBCAParams, safetyP
 from mpclab_strategy_obca.dynamics.dynamicsModels import bike_dynamics_rk4
 from mpclab_strategy_obca.dynamics.utils.types import dynamicsKinBikeParams
 
-from mpclab_strategy_obca.utils.utils import get_car_poly
+from mpclab_strategy_obca.utils.utils import get_car_poly, check_collision_poly
 
-class strategyOBCAControlNode(object):
+class naiveOBCAControlNode(object):
     def __init__(self):
         # Read parameter values from ROS parameter server
-        rospy.init_node('strategy_obca_control')
+        rospy.init_node('naive_obca_control')
 
         self.dt = rospy.get_param('controller/dt')
         self.init_time = rospy.get_param('controller/init_time')
@@ -56,8 +58,8 @@ class strategyOBCAControlNode(object):
 
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
-        self.TV_L = rospy.get_param('/barc_2/car/plot/L')
-        self.TV_W = rospy.get_param('/barc_2/car/plot/W')
+        self.TV_L = rospy.get_param('/target_vehicle/car/plot/L')
+        self.TV_W = rospy.get_param('/target_vehicle/car/plot/W')
 
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
         self.dynamics = bike_dynamics_rk4(dyn_params)
@@ -104,9 +106,8 @@ class strategyOBCAControlNode(object):
         self.ev_state_prediction = None
         self.ev_input_prediction = None
 
-
         rospy.Subscriber('est_states', States, self.estimator_callback, queue_size=1)
-        rospy.Subscriber('/barc_2/tv_prediction', Prediction, self.prediction_callback, queue_size=1)
+        rospy.Subscriber('/target_vehicle/prediction', Prediction, self.prediction_callback, queue_size=1)
 
         # Publisher for steering and motor control
         self.ecu_pub = rospy.Publisher('ecu', ECU, queue_size=1)
@@ -115,8 +116,8 @@ class strategyOBCAControlNode(object):
 
         # Create bond to shutdown data logger and arduino interface when controller stops
         bond_id = rospy.get_param('car/name')
-        # self.bond_log = bondpy.Bond('controller_logger', bond_id)
-        # self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
+        self.bond_log = bondpy.Bond('controller_logger', bond_id)
+        self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
 
         self.start_time = 0
 
@@ -207,7 +208,7 @@ class strategyOBCAControlNode(object):
             self.rate.sleep()
 
 if __name__ == '__main__':
-    strategy_obca_node = strategyOBCAControlNode()
+    naive_obca_node = naiveOBCAControlNode()
     try:
-        strategy_obca_node.spin()
+        naive_obca_node.spin()
     except rospy.ROSInterruptException: pass
