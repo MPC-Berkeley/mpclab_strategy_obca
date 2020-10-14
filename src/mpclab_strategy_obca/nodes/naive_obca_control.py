@@ -150,6 +150,7 @@ class naiveOBCAControlNode(object):
             EV_state = self.state
             TV_pred = self.tv_state_prediction[:self.N+1]
 
+            print(TV_pred.shape)
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
 
@@ -205,6 +206,7 @@ class naiveOBCAControlNode(object):
             ecu_msg.servo = U_pred[0,0]
             ecu_msg.motor = U_pred[0,1]
             self.ecu_pub.publish(ecu_msg)
+            print(ecu_msg)
 
             self.rate.sleep()
 

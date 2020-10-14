@@ -19,6 +19,9 @@ class trackingControlNode(object):
         # Read parameter values from ROS parameter server
         rospy.init_node('naive_obca_control')
 
+        ns = rospy.get_namespace()
+        vehicle_ns = '/'.join(ns.split('/')[:-1])
+
         self.dt = rospy.get_param('controller/dt')
         self.init_time = rospy.get_param('controller/init_time')
         self.max_time = rospy.get_param('controller/max_time')
@@ -47,12 +50,16 @@ class trackingControlNode(object):
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
 
-        self.trajectory = load_vehicle_trajectory(self.trajectory_file)
-        rospy.set_param('car/car_init/x')
-        rospy.set_param('car/car_init/y')
-        rospy.set_param('car/car_init/heading')
-        rospy.set_param('car/car_init/v')
-        
+        self.scaling_factor = 1/5
+        self.trajectory = np.multiply(load_vehicle_trajectory(self.trajectory_file), np.array([self.scaling_factor, self.scaling_factor, 1, self.scaling_factor]))
+        self.traj_len = self.trajectory.shape[0]
+
+        rospy.set_param('/'.join((vehicle_ns,'car/car_init/x')), float(self.trajectory[0,0]))
+        rospy.set_param('/'.join((vehicle_ns,'car/car_init/y')), float(self.trajectory[0,1]))
+        rospy.set_param('/'.join((vehicle_ns,'car/car_init/z')), 0.0)
+        rospy.set_param('/'.join((vehicle_ns,'car/car_init/heading')), float(self.trajectory[0,2]))
+        rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), float(self.trajectory[0,3]))
+
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
         self.dynamics = bike_dynamics_rk4(dyn_params)
 
@@ -114,21 +121,29 @@ class trackingControlNode(object):
 
             x, y, heading, v = state
 
-            Z_ref = self.trajectory[counter:counter+self.N+1]
-
-            if self.state_prediction is None:
-                Z_ws = Z_ref
-                U_ws = np.zeros((self.N, self.n_u))
+            if counter >= self.traj_len-(self.N+1):
+                U_pred = np.zeros((self.N, self.n_u))
+                Z_pred = np.tile(self.trajectory[-1], (self.N+1,1))
+                rospy.loginfo('TRACKING: End of trajectory reached')
             else:
-                Z_ws = np.vstack((self.state_prediction[1:],
-                    self.dynamics.f_dt(self.state_prediction[-1], self.ev_input_prediction[-1], type='numpy')))
-                U_ws = np.vstack((self.input_prediction[1:],
-                    self.input_prediction[-1]))
+                ref_idx = [min(counter, self.traj_len-1), min(counter+self.N+1,self.traj_len)]
+                Z_ref = self.trajectory[ref_idx[0]:ref_idx[1]]
+                if Z_ref.shape[0] < self.N+1:
+                    Z_ref = np.vstack((Z_ref, np.tile(self.trajectory[-1], (self.N+1-(ref_idx[1]-ref_idx[0])))))
 
-            Z_pred, U_pred, status_sol = self.tracking_controller.solve(state, self.last_input, Z_ref, Z_ws, U_ws)
+                if self.state_prediction is None:
+                    Z_ws = Z_ref
+                    U_ws = np.zeros((self.N, self.n_u))
+                else:
+                    Z_ws = np.vstack((self.state_prediction[1:],
+                        self.dynamics.f_dt(self.state_prediction[-1], self.ev_input_prediction[-1], type='numpy')))
+                    U_ws = np.vstack((self.input_prediction[1:],
+                        self.input_prediction[-1]))
 
-            if not status_sol['success']:
-                rospy.loginfo('Tracking MPC not feasible')
+                Z_pred, U_pred, status_sol = self.tracking_controller.solve(state, self.last_input, Z_ref, Z_ws, U_ws)
+
+                if not status_sol['success']:
+                    rospy.loginfo('TRACKING: MPC not feasible')
 
             self.ev_state_prediction = Z_pred
             self.ev_input_prediction = U_pred
@@ -145,7 +160,9 @@ class trackingControlNode(object):
             pred_msg.y = Z_pred[:,1]
             pred_msg.psi = Z_pred[:,2]
             pred_msg.v = Z_pred[:,3]
-            pred_pub.publish(pred_msg)
+            self.pred_pub.publish(pred_msg)
+
+            counter += 1
 
             self.rate.sleep()
 

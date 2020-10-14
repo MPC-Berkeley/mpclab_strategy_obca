@@ -239,7 +239,7 @@ class strategyOBCAControlNode(object):
 
                     hyp_xy, hyp_w, hyp_b, _ = self.constraint_generator.generate_constraint(Z_check[i], TV_pred[i], d, scalings[i])
 
-                    hyp[i] = {'w': np.concatenate(hyp_w, np.zeros(2)), 'b': hyp_b, 'pos', hyp_xy}
+                    hyp[i] = {'w': np.concatenate(hyp_w, np.zeros(2)), 'b': hyp_b, 'pos': hyp_xy}
 
             if self.ev_state_prediction is None:
                 Z_ws = Z_ref

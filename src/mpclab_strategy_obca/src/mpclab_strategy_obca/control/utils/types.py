@@ -82,12 +82,13 @@ class strategyOBCAParams(PythonMsg):
     ws_name: str = field(default="ws_solver_strat")
     opt_name: str = field(default="opt_sovler_strat")
 
+@dataclass
 class trackingParams(PythonMsg):
     dt: float = field(default=0.1)
     n: int = field(default=4)
     d: int = field(default=2)
 
-    N: int = field(default=20)
+    N: int = field(default=50)
 
     Q: np.array = field(default=np.diag([10, 1, 1, 5]))
     R: np.array = field(default=np.diag([1, 1]))
