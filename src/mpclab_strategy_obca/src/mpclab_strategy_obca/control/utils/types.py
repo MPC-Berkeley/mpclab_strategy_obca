@@ -81,3 +81,21 @@ class strategyOBCAParams(PythonMsg):
 
     ws_name: str = field(default="ws_solver_strat")
     opt_name: str = field(default="opt_sovler_strat")
+
+class trackingParams(PythonMsg):
+    dt: float = field(default=0.1)
+    n: int = field(default=4)
+    d: int = field(default=2)
+
+    N: int = field(default=20)
+
+    Q: np.array = field(default=np.diag([10, 1, 1, 5]))
+    R: np.array = field(default=np.diag([1, 1]))
+
+    u_l: np.array = field(default=np.array([-0.5, -2.5]))
+    u_u: np.array = field(default=np.array([0.5, 1.5]))
+    du_l: np.array = field(default=np.array([-0.6, -8]))
+    du_u: np.array = field(default=np.array([0.6, 5]))
+
+    optlevel: int = field(default=3)
+    opt_name: str = field(default="tracking_solver")

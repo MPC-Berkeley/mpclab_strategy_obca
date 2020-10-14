@@ -90,7 +90,7 @@ class strategyOBCAControlNode(object):
             optlevel=self.optlevel)
         self.obca_controller = StrategyOBCAController(self.dynamics, obca_params)
         self.obca_controller.initialize(regen=False)
-        
+
         safety_params = safetyParams(dt=self.dt,
             P_accel=self.P_accel, I_accel=self.I_accel, D_accel=self.D_accel,
             P_steer=self.P_steer, I_steer=self.I_steer, D_steer=self.D_steer,
@@ -185,7 +185,7 @@ class strategyOBCAControlNode(object):
                 rospy.signal_shutdown(end_msg)
 
             EV_state = self.state
-            TV_pred = self.tv_state_prediction
+            TV_pred = self.tv_state_prediction[:self.N+1]
 
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]

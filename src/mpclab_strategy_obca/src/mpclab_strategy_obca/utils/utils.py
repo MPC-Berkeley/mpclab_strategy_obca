@@ -3,6 +3,7 @@
 import numpy as np
 from numpy import sin, cos
 from pypoman import compute_polytope_halfspaces, compute_polytope_vertices, intersect_polygons
+from scipy.io import loadmat
 
 import pdb
 
@@ -52,15 +53,34 @@ def get_car_verts(z, W, L):
 def scale_state(x, x_range, scale, bias):
     return np.multiply(np.divide(x - x_range[0], x_range[1]-x_range[0]), scale) + bias
 
+def load_vehicle_trajectory(filename):
+    vars = loadmat(filename)
+
+    if 'TV' not in vars.keys():
+        raise RuntimeError("The .mat file must have the variable 'TV', a MATLAB struct containing target vehicle state trajectory")
+
+    TV = vars['TV']
+    TV_x = TV[0][0][5]
+    TV_y = TV[0][0][6]
+    TV_heading = TV[0][0][7]
+    TV_v = TV[0][0][8]
+
+    TV_traj = np.hstack((TV_x, TV_y, TV_heading, TV_v))
+
+    return TV_traj
+
 if __name__ == '__main__':
-    W = 2
-    L = 4
+    # W = 2
+    # L = 4
+    #
+    # s_1 = np.array([[0,0,0,0]])
+    # s_2 = np.array([[1,0,0,0]])
+    # obs_1 = get_car_poly(s_1, W, L)
+    # obs_2 = get_car_poly(s_2, W, L)
+    #
+    # collision = check_collision_poly(s_1[0], (W, L), s_2[0], (W, L))
+    # print(collision)
 
-    s_1 = np.array([[0,0,0,0]])
-    s_2 = np.array([[1,0,0,0]])
-    obs_1 = get_car_poly(s_1, W, L)
-    obs_2 = get_car_poly(s_2, W, L)
-
-    collision = check_collision_poly(s_1[0], (W, L), s_2[0], (W, L))
-    print(collision)
+    filename = '/home/edward-zhu/parking_scenarios/exp_num_1.mat'
+    load_vehicle_trajectory(filename)
     pdb.set_trace()

@@ -148,7 +148,7 @@ class naiveOBCAControlNode(object):
                 rospy.signal_shutdown('Max time of %g reached, controller shutting down...' % self.max_time)
 
             EV_state = self.state
-            TV_pred = self.tv_state_prediction
+            TV_pred = self.tv_state_prediction[:self.N+1]
 
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
