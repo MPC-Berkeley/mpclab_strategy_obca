@@ -65,7 +65,7 @@ class naiveOBCAControlNode(object):
         self.dynamics = bike_dynamics_rk4(dyn_params)
 
         G = np.array([[1,0], [-1, 0], [0, 1], [0, -1]])
-        g = np.array([2.45, 2.45, 1.03, 1.03])
+        g = np.array([self.EV_L/2, self.EV_L/2, self.EV_W/2, self.EV_W/2])
         obca_params = strategyOBCAParams(dt=self.dt, N=self.N, n=self.n_x, d=self.n_u,
             n_obs=self.n_obs, n_ineq=self.n_ineq, d_ineq=self.d_ineq,
             G=G, g=g, Q=self.Q, R=self.R, d_min=self.d_min,

@@ -100,8 +100,8 @@ class StrategyOBCAController(abstractController):
 			obs_A = []
 			obs_b = []
 			for i in range(self.n_obs):
-				obs_A.append( obs[i][k]["A"].reshape(-1) )
-				obs_b.append( obs[i][k]["b"].reshape(-1) )
+				obs_A.append( obs[i][k]["A"].flatten(order='F') )
+				obs_b.append( obs[i][k]["b"].flatten(order='F') )
 
 			params.append( z[k, :] )
 			params.append( np.hstack( obs_A ) )
@@ -113,7 +113,7 @@ class StrategyOBCAController(abstractController):
 		output, exitflag, info = self.ws_solver.solve(problem)
 
 		if exitflag == 1:
-			print("FORCES took %d iterations and %f seconds to solve the problem.\n" %(info.it, info.solvetime) )
+			print("WS: FORCES took %d iterations and %f seconds to solve the problem.\n" %(info.it, info.solvetime) )
 			status = {"success": True,
 						"return_status": "Successfully Solved",
 						"solve_time": info.solvetime}
@@ -134,7 +134,7 @@ class StrategyOBCAController(abstractController):
 			self.lambda_ws = l_ws
 			self.mu_ws = m_ws
 		else:
-			print("Solving Failed, exitflag = %d\n" % exitflag)
+			print("WS: Solving Failed, exitflag = %d\n" % exitflag)
 			status = {"success": False,
 						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
 						"solve_time": None}
@@ -149,8 +149,8 @@ class StrategyOBCAController(abstractController):
 			obs_A = []
 			obs_b = []
 			for i in range(self.n_obs):
-				obs_A.append( obs[i][k]["A"].reshape(-1) )
-				obs_b.append( obs[i][k]["b"].reshape(-1) )
+				obs_A.append( obs[i][k]["A"].flatten(order='F') )
+				obs_b.append( obs[i][k]["b"].flatten(order='F') )
 
 			params.append( z_ref[k, :] )
 			params.append( np.hstack( obs_A ) )
@@ -176,13 +176,13 @@ class StrategyOBCAController(abstractController):
 		output, exitflag, info = self.opt_solver.solve(problem)
 
 		if exitflag == 1:
-			print("FORCES took %d iterations and %f seconds to solve the problem." % (info.it,info.solvetime))
+			print("OPT: FORCES took %d iterations and %f seconds to solve the problem." % (info.it,info.solvetime))
 			status = {"success": True,
 						"return_status": "Successfully Solved",
 						"solve_time": info.solvetime,
 						"info": info}
 		else:
-			print("Solving Failed, exitflag = %d\n" % exitflag)
+			print("OPT: Solving Failed, exitflag = %d\n" % exitflag)
 			status = {"success": False,
 						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
 						"solve_time": None,
@@ -590,8 +590,10 @@ class NaiveOBCAController(abstractController):
 			obs_A = []
 			obs_b = []
 			for i in range(self.n_obs):
-				obs_A.append( obs[i][k]["A"].reshape(-1) )
-				obs_b.append( obs[i][k]["b"].reshape(-1) )
+				# obs_A.append( obs[i][k]["A"].reshape(-1) )
+				# obs_b.append( obs[i][k]["b"].reshape(-1) )
+				obs_A.append( obs[i][k]["A"].flatten(order='F') )
+				obs_b.append( obs[i][k]["b"].flatten(order='F') )
 
 			params.append( z[k, :] )
 			params.append( np.hstack( obs_A ) )
@@ -603,7 +605,7 @@ class NaiveOBCAController(abstractController):
 		output, exitflag, info = self.ws_solver.solve(problem)
 
 		if exitflag == 1:
-			print("FORCES took %d iterations and %f seconds to solve the problem.\n" %(info.it, info.solvetime) )
+			print("WS: FORCES took %d iterations and %f seconds to solve the problem.\n" %(info.it, info.solvetime) )
 			status = {"success": True,
 						"return_status": "Successfully Solved",
 						"solve_time": info.solvetime}
@@ -624,7 +626,7 @@ class NaiveOBCAController(abstractController):
 			self.lambda_ws = l_ws
 			self.mu_ws = m_ws
 		else:
-			print("Solving Failed, exitflag = %d\n" % exitflag)
+			print("WS: Solving Failed, exitflag = %d\n" % exitflag)
 			status = {"success": False,
 						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
 						"solve_time": None}
@@ -639,8 +641,8 @@ class NaiveOBCAController(abstractController):
 			obs_A = []
 			obs_b = []
 			for i in range(self.n_obs):
-				obs_A.append( obs[i][k]["A"].reshape(-1) )
-				obs_b.append( obs[i][k]["b"].reshape(-1) )
+				obs_A.append( obs[i][k]["A"].flatten(order='F') )
+				obs_b.append( obs[i][k]["b"].flatten(order='F') )
 
 			params.append( z_ref[k, :] )
 			params.append( np.hstack( obs_A ) )
@@ -664,13 +666,13 @@ class NaiveOBCAController(abstractController):
 		output, exitflag, info = self.opt_solver.solve(problem)
 
 		if exitflag == 1:
-			print("FORCES took %d iterations and %f seconds to solve the problem." % (info.it,info.solvetime))
+			print("OPT: FORCES took %d iterations and %f seconds to solve the problem." % (info.it,info.solvetime))
 			status = {"success": True,
 						"return_status": "Successfully Solved",
 						"solve_time": info.solvetime,
 						"info": info}
 		else:
-			print("Solving Failed, exitflag = %d\n" % exitflag)
+			print("OPT: Solving Failed, exitflag = %d\n" % exitflag)
 			status = {"success": False,
 						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
 						"solve_time": None,
