@@ -37,7 +37,7 @@ class safetyController(abstractController):
 
         accel, _ = self.accel_pid.solve(v, last_accel)
         if v < 0:
-            steer, _ = self.steer_pid.solve(y_ev-10*heading_ev, last_steer)
+            steer, _ = self.steer_pid.solve(y-10*heading, last_steer)
         else:
             steer = 0
 
@@ -86,7 +86,7 @@ class emergencyController(abstractController):
 
         accel, _ = self.accel_pid.solve(v, last_accel)
         if v < 0:
-            steer, _ = self.steer_pid.solve(y_ev-10*heading_ev, last_steer)
+            steer, _ = self.steer_pid.solve(y-10*heading, last_steer)
         else:
             steer = 0
 

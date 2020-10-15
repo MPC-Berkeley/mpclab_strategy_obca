@@ -50,7 +50,7 @@ class trackingControlNode(object):
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
 
-        self.scaling_factor = 1/5
+        self.scaling_factor = 1/6
         self.trajectory = np.multiply(load_vehicle_trajectory(self.trajectory_file), np.array([self.scaling_factor, self.scaling_factor, 1, self.scaling_factor]))
         self.traj_len = self.trajectory.shape[0]
 
