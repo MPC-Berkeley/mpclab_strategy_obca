@@ -29,17 +29,6 @@ def get_car_poly(Z, W, L):
 
     for i in range(N):
         V = get_car_verts(Z[i], W, L)
-        # try:
-        #     A, b = compute_polytope_halfspaces(V)
-        # except RuntimeError:
-        #     q, r = np.divmod(Z[i,2], np.pi/2)
-        #     A = np.array([[1,0],[-1,0],[0,1],[0,-1]])
-        #     if np.mod(q,2) == 1:
-        #         b = np.array([W/2, W/2, L/2, L/2])
-        #     else:
-        #         b = np.array([L/2, L/2, W/2, W/2])
-        # if A.shape[0] != 4:
-        #     print(V)
         A, b, _ = quickhull(V)
         obs.append({'A': A, 'b': b})
 

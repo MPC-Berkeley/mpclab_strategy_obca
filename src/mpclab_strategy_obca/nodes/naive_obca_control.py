@@ -123,6 +123,7 @@ class naiveOBCAControlNode(object):
         self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
 
         self.start_time = 0
+        self.task_finished = False
 
         self.rate = rospy.Rate(1.0/self.dt)
 
@@ -139,6 +140,7 @@ class naiveOBCAControlNode(object):
         while not rospy.is_shutdown():
             t = rospy.get_rostime().to_sec()
             ecu_msg = ECU()
+
             if t-self.start_time >= self.max_time:
                 ecu_msg.servo = 0.0
                 ecu_msg.motor = 0.0
@@ -152,7 +154,6 @@ class naiveOBCAControlNode(object):
             EV_state = self.state
             TV_pred = self.tv_state_prediction[:self.N+1]
 
-            print(TV_pred.shape)
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
 
@@ -187,7 +188,7 @@ class naiveOBCAControlNode(object):
                 u_safe = self.safety_controller.solve(EV_state, TV_pred, self.last_input)
 
                 z_next = self.dynamics.f_dt(EV_state, u_safe, type='numpy')
-                collision = check_collision_poly(z_next, (self.EV_W, self.EV_L), TV_pred[1], (self.EV_W, self.EV_L))
+                collision = check_collision_poly(z_next, (self.EV_W, self.EV_L), TV_pred[1], (self.TV_W, self.TV_L))
                 if collision:
                     obca_mpc_ebrake = True
                     u_safe = self.emergency_controller.solve(EV_state, TV_pred, self.last_input)
