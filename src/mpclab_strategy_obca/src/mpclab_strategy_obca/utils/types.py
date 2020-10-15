@@ -22,7 +22,7 @@ class experimentParams(PythonMsg):
     collision_buffer_r: float = field(default=1.0)
     confidence_thresh: float = field(default=0.55)
 
-    x_max: float = field(default=30.)
+    x_max: float = field(default=10.0)
     T: int = field(default=1500)
 
     T_tv: int = field(default=200)

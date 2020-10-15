@@ -52,6 +52,8 @@ class strategyOBCAControlNode(object):
         self.Q = np.diag(rospy.get_param('controller/obca/Q'))
         self.R = np.diag(rospy.get_param('controller/obca/R'))
         self.optlevel = rospy.get_param('controller/obca/optlevel')
+        self.lock_steps = rospy.get_param('controller/obca/lock_steps')
+        self.T_tv = rospy.get_param('controller/obca/T_tv')
 
         self.nn_model_file = rospy.get_param('controller/obca/nn_model_file')
         self.smooth_prediction = rospy.get_param('controller/obca/smooth_prediction')
@@ -112,7 +114,7 @@ class strategyOBCAControlNode(object):
         strategy_params = strategyPredictorParams(nn_model_file=self.nn_model_file, smooth_prediction=self.smooth_prediction,
             W_kf=self.W_kf, V_kf=self.V_kf, Pm_kf=self.Pm_kf,
             A_kf=self.A_kf, H_kf=self.H_kf)
-        self.stragegy_predictor = strategyPredictor(strategy_params)
+        self.strategy_predictor = strategyPredictor(strategy_params)
 
         collision_buffer_r = np.sqrt(self.EV_L**2+self.EV_W**2)
         a_lim = np.array([self.accel_min, self.accel_max])
@@ -197,25 +199,25 @@ class strategyOBCAControlNode(object):
 
             # Get target vehicle trajectory relative to ego vehicle state
             if self.state_machine.state in ['Safe-Confidence', 'Safe-Yield', 'Safe-Infeasible'] or EV_v*np.cos(EV_heading) <= 0:
-                rel_state = np.hstack((TV_x-EV_x,
-                    TV_y-EV_y,
-                    TV_heading-EV_heading,
-                    np.multiply(TV_v, np.cos(TV_heading))-0,
-                    np.multiply(TV_v, np.sin(TV_heading))-EV_v*np.sin(EV_heading)))
+                rel_state = np.vstack((TV_pred[:,0]-EV_x, \
+                    TV_pred[:,1]-EV_y, \
+                    TV_pred[:,2]-EV_heading, \
+                    np.multiply(TV_pred[:,3], np.cos(TV_pred[:,2]))-0, \
+                    np.multiply(TV_pred[:,3], np.sin(TV_pred[:,2]))-EV_v*np.sin(EV_heading))).T
             else:
-                rel_state = np.hstack((TV_x-EV_x,
-                    TV_y-EV_y,
-                    TV_heading-EV_heading,
-                    np.multiply(TV_v, np.cos(TV_heading))-EV_v*np.cos(EV_heading))),
-                    np.multiply(TV_v, np.sin(TV_heading))-EV_v*np.sin(EV_heading)))
+                rel_state = np.vstack((TV_pred[:,0]-EV_x, \
+                    TV_pred[:,1]-EV_y, \
+                    TV_pred[:,2]-EV_heading, \
+                    np.multiply(TV_pred[:,3], np.cos(TV_pred[:,2]))-EV_v*np.cos(EV_heading), \
+                    np.multiply(TV_pred[:,3], np.sin(TV_pred[:,2]))-EV_v*np.sin(EV_heading))).T
 
             # Scale the relative state
             # rel_state = scale_state(rel_state, rel_range, scale, bias)
 
             # Predict strategy to use
-            scores = self.stragegy_predictor.predict(rel_state.flatten())
-
-            exp_state = experimentStates(t=t, EV_curr=EV_state, TV_pred=TV_pred, score=score)
+            scores = self.strategy_predictor.predict(rel_state.flatten(order='F'))
+            print(scores)
+            exp_state = experimentStates(t=t, EV_curr=EV_state, TV_pred=TV_pred, score=scores)
             self.state_machine.state_transition(exp_state)
 
             if self.state_machine.state == 'End':
@@ -232,7 +234,7 @@ class strategyOBCAControlNode(object):
             Z_check = Z_ref
             scale_mult = 1.0
             scalings = np.maximum(np.ones(self.N+1), scale_mult*np.abs(TV_v)/self.v_ref)
-            collisions = self.constraint_generator.check_collision_points(Z_check, TV_pred, scalings)
+            collisions = self.constraint_generator.check_collision_points(Z_check[:,:2], TV_pred, scalings)
 
             exp_state.ref_col = collisions
             self.state_machine.state_transition(exp_state)
@@ -251,7 +253,7 @@ class strategyOBCAControlNode(object):
 
                     hyp_xy, hyp_w, hyp_b, _ = self.constraint_generator.generate_constraint(Z_check[i], TV_pred[i], d, scalings[i])
 
-                    hyp[i] = {'w': np.concatenate(hyp_w, np.zeros(2)), 'b': hyp_b, 'pos': hyp_xy}
+                    hyp[i] = {'w': np.concatenate((hyp_w, np.zeros(2))), 'b': hyp_b, 'pos': hyp_xy}
 
             if self.ev_state_prediction is None:
                 Z_ws = Z_ref
@@ -277,8 +279,8 @@ class strategyOBCAControlNode(object):
             self.state_machine.state_transition(exp_state)
 
             if self.state_machine.state in ['Safe-Confidence', 'Safe-Yield', 'Safe-Infeasible']:
-                safety_control.set_accel_ref(TV_v*np.cos(TV_heading))
-                u_safe = safety_control.solve(EV_state, TV_pred, self.last_input)
+                self.safety_controller.set_accel_ref(EV_v*np.cos(EV_heading), TV_v*np.cos(TV_heading))
+                u_safe = self.safety_controller.solve(EV_state, TV_pred, self.last_input)
 
                 z_next = self.dynamics.f_dt(EV_state, u_safe, type='numpy')
                 collision = check_collision_poly(z_next, (self.EV_W, self.EV_L), TV_pred[1], (self.TV_W, self.TV_L))
@@ -296,7 +298,7 @@ class strategyOBCAControlNode(object):
                     Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
                 rospy.loginfo('Applying safety control')
             elif self.state_machine.state in ['Emergency-Break']:
-                u_ebrake = emergency_control.solve(EV_state, TV_pred, self.last_input)
+                u_ebrake = self.emergency_controller.solve(EV_state, TV_pred, self.last_input)
 
                 U_pred = np.vstack((u_ebrake, np.zeros((self.N-1, self.n_u))))
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))

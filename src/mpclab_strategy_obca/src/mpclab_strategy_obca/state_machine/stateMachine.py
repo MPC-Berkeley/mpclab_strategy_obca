@@ -1,6 +1,7 @@
 #!/usr/bin python3
 
 import numpy as np
+import numpy.linalg as la
 
 from mpclab_strategy_obca.utils.types import experimentParams
 from mpclab_strategy_obca.utils.types import experimentStates
@@ -56,12 +57,12 @@ class stateMachine(object):
                 state_next = "HOBCA-Unlocked"
 
                 # Max score
-                max_idx = np.amax(score)
+                max_idx = np.argmax(score)
                 strategy_tmp = self.strategy_names[max_idx]
 
                 if strategy_tmp == "Yield":
                     raise Exception("%s: Yield is triggered when transition to HOBCA unlocked" % self.state)
-                
+
                 strategy_next = strategy_tmp
             else:
                 state_next = "Free-Driving"
@@ -79,12 +80,12 @@ class stateMachine(object):
                 state_next = "HOBCA-Unlocked"
 
                 # Max score
-                max_idx = np.amax(score)
+                max_idx = np.argmax(score)
                 strategy_tmp = self.strategy_names[max_idx]
 
                 if strategy_tmp == "Yield":
                     raise Exception("%s: Yield is triggered when transition to HOBCA unlocked" % self.state)
-                
+
                 strategy_next = strategy_tmp
             else:
                 state_next = "Safe-Confidence"
@@ -103,12 +104,12 @@ class stateMachine(object):
                 state_next = "HOBCA-Unlocked"
 
                 # Max score
-                max_idx = np.amax(score)
+                max_idx = np.argmax(score)
                 strategy_tmp = self.strategy_names[max_idx]
 
                 if strategy_tmp == "Yield":
                     raise Exception("%s: Yield is triggered when transition to HOBCA unlocked" % self.state)
-                
+
                 strategy_next = strategy_tmp
             else:
                 state_next = "Safe-Yield"
@@ -130,12 +131,12 @@ class stateMachine(object):
                 state_next = "HOBCA-Unlocked"
 
                 # Max score
-                max_idx = np.amax(score)
+                max_idx = np.argmax(score)
                 strategy_tmp = self.strategy_names[max_idx]
 
                 if strategy_tmp == "Yield":
                     raise Exception("%s: Yield is triggered when transition to HOBCA unlocked" % self.state)
-                
+
                 strategy_next = strategy_tmp
             else:
                 state_next = "Safe-Infeasible"
@@ -151,7 +152,7 @@ class stateMachine(object):
             elif self.toSafeYield(score, EV_curr, TV_pred):
                 state_next = "Safe-Yield"
                 strategy_next = "Yield"
-            elif self.toSafeInfeas(score, EV_curr, TV_pred):
+            elif self.toSafeInfeas(feas, EV_curr, TV_pred):
                 state_next = "Safe-Infeasible"
                 strategy_next = "Yield"
             elif self.toHOBCA_lock(score, ref_col, feas, EV_curr, TV_pred):
@@ -161,12 +162,12 @@ class stateMachine(object):
                 state_next = "HOBCA-Unlocked"
 
                 # Max score
-                max_idx = np.amax(score)
+                max_idx = np.argmax(score)
                 strategy_tmp = self.strategy_names[max_idx]
 
                 if strategy_tmp == "Yield":
                     raise Exception("%s: Yield is triggered when transition to HOBCA unlocked" % self.state)
-                
+
                 strategy_next = strategy_tmp
         elif self.state == "HOBCA-Locked":
             if self.toEnd(t, EV_curr):
@@ -176,7 +177,7 @@ class stateMachine(object):
             elif self.toSafeYield(score, EV_curr, TV_pred):
                 state_next = "Safe-Yield"
                 strategy_next = "Yield"
-            elif self.toSafeInfeas(score, EV_curr, TV_pred):
+            elif self.toSafeInfeas(feas, EV_curr, TV_pred):
                 state_next = "Safe-Infeasible"
                 strategy_next = "Yield"
             else:
@@ -196,19 +197,19 @@ class stateMachine(object):
             elif self.toSafeYield(score, EV_curr, TV_pred):
                 state_next = "Safe-Yield"
                 strategy_next = "Yield"
-            elif self.toSafeInfeas(score, EV_curr, TV_pred):
+            elif self.toSafeInfeas(feas, EV_curr, TV_pred):
                 state_next = "Safe-Infeasible"
                 strategy_next = "Yield"
             elif self.toHOBCA(score, feas, EV_curr, TV_pred):
                 state_next = "HOBCA-Unlocked"
 
                 # Max score
-                max_idx = np.amax(score)
+                max_idx = np.argmax(score)
                 strategy_tmp = self.strategy_names[max_idx]
 
                 if strategy_tmp == "Yield":
                     raise Exception("%s: Yield is triggered when transition to HOBCA unlocked" % self.state)
-                
+
                 strategy_next = strategy_tmp
             else:
                 raise Exception("%s: Unexpected Situation" % self.state)
@@ -259,24 +260,24 @@ class stateMachine(object):
 
         if np.all( rel_state[0, :] > 20 ) or rel_state[0, 0] < -self.collision_buffer_r:
             return False
-        
+
         # Compute the distance threshold for applying braking assuming max
 	    # decceleration is applied
 
-        TV_v = np.norm(TV_pred[3:4, 0])
+        TV_v = la.norm(TV_pred[3:4, 0])
         TV_th = TV_pred[2, 0]
 
-        EV_v = np.norm(EV_curr[3:4])
+        EV_v = la.norm(EV_curr[3:4])
         EV_th = EV_curr[2]
 
-        rel_vx = TV_v * np.cos(TV_th[0]) - EV_v * np.cos(EV_th)
+        rel_vx = TV_v * np.cos(TV_th) - EV_v * np.cos(EV_th)
         min_ts = np.ceil(-rel_vx / np.abs(self.a_lim[0]) / self.dt) # Number of timesteps requred for relative velocity to be zero
         v_brake = np.abs(rel_vx) + np.arange(min_ts+1) * self.dt * self.a_lim[0] # Velocity when applying max decceleration
         brake_thresh = np.sum( np.abs(v_brake) * self.dt ) + 5 * self.collision_buffer_r # Distance threshold for safety controller to be applied
-        d = np.norm(TV_pred[0:2,0] - EV_curr[0:2, 1]) # Distance between ego and target vehicles
+        d = la.norm(TV_pred[:2,0] - EV_curr[:2]) # Distance between ego and target vehicles
 
         # Max score
-        max_idx = np.amax(score)
+        max_idx = np.argmax(score)
 
         # If all scores are below the confidence threshold
 
@@ -289,17 +290,17 @@ class stateMachine(object):
         """
         Transition to Safety Control - Yield
         """
-        
+
         rel_state = TV_pred - EV_curr
 
         if np.all( rel_state[0, :] > 20 ) or rel_state[0, 0] < -self.collision_buffer_r:
             return False
-        
+
         # Max score
-        max_idx = np.amax(score)
+        max_idx = np.argmax(score)
         strategy_tmp = self.strategy_names[max_idx]
 
-        # If amax of score is yield
+        # If argmax of score is yield
 
         if strategy_tmp == "Yield":
             return True
@@ -330,14 +331,14 @@ class stateMachine(object):
             return False
 
         # Max score
-        max_idx = np.amax(score)
+        max_idx = np.argmax(score)
         strategy_tmp = self.strategy_names[max_idx]
 
         if score[max_idx] > self.confidence_thresh and (not strategy_tmp == "Yield") and feas:
             return True
         else:
             return False
-    
+
     def toHOBCA_lock(self, score, ref_col, feas, EV_curr, TV_pred):
         """
         Transition to HOBCA - Locked
@@ -348,7 +349,7 @@ class stateMachine(object):
             return False
 
         # Max score
-        max_idx = np.amax(score)
+        max_idx = np.argmax(score)
         strategy_tmp = self.strategy_names[max_idx]
 
         if (np.sum(ref_col) >= self.lock_steps) and (score[max_idx] > self.confidence_thresh) and (not strategy_tmp == "Yield") and feas:
