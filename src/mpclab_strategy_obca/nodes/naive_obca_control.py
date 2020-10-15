@@ -108,10 +108,12 @@ class naiveOBCAControlNode(object):
         self.ev_input_prediction = None
 
         rospy.Subscriber('est_states', States, self.estimator_callback, queue_size=1)
-        rospy.Subscriber('/target_vehicle/prediction', Prediction, self.prediction_callback, queue_size=1)
+        rospy.Subscriber('/target_vehicle/pred_states', Prediction, self.prediction_callback, queue_size=1)
 
         # Publisher for steering and motor control
         self.ecu_pub = rospy.Publisher('ecu', ECU, queue_size=1)
+        # Publisher for mpc prediction
+        self.pred_pub = rospy.Publisher('pred_states', Prediction, queue_size=1)
         # Publisher for data logger
         # self.log_pub = rospy.Publisher('log_states', States, queue_size=1)
 
@@ -206,7 +208,15 @@ class naiveOBCAControlNode(object):
             ecu_msg.servo = U_pred[0,0]
             ecu_msg.motor = U_pred[0,1]
             self.ecu_pub.publish(ecu_msg)
-            print(ecu_msg)
+
+            pred_msg = Prediction()
+            pred_msg.x = Z_pred[:,0]
+            pred_msg.y = Z_pred[:,1]
+            pred_msg.psi = Z_pred[:,2]
+            pred_msg.v = Z_pred[:,3]
+            pred_msg.df = U_pred[:,0]
+            pred_msg.a = U_pred[:,1]
+            self.pred_pub.publish(pred_msg)
 
             self.rate.sleep()
 

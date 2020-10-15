@@ -50,7 +50,7 @@ class trackingControlNode(object):
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
 
-        self.scaling_factor = 1/6
+        self.scaling_factor = 1/15
         self.trajectory = np.multiply(load_vehicle_trajectory(self.trajectory_file), np.array([self.scaling_factor, self.scaling_factor, 1, self.scaling_factor]))
         self.traj_len = self.trajectory.shape[0]
 
@@ -83,7 +83,7 @@ class trackingControlNode(object):
         # Publisher for steering and motor control
         self.ecu_pub = rospy.Publisher('ecu', ECU, queue_size=1)
         # Publisher for state predictions
-        self.pred_pub = rospy.Publisher('prediction', Prediction, queue_size=1)
+        self.pred_pub = rospy.Publisher('pred_states', Prediction, queue_size=1)
         # Publisher for data logger
         # self.log_pub = rospy.Publisher('log_states', States, queue_size=1)
 
@@ -128,15 +128,13 @@ class trackingControlNode(object):
             else:
                 ref_idx = [min(counter, self.traj_len-1), min(counter+self.N+1,self.traj_len)]
                 Z_ref = self.trajectory[ref_idx[0]:ref_idx[1]]
-                if Z_ref.shape[0] < self.N+1:
-                    Z_ref = np.vstack((Z_ref, np.tile(self.trajectory[-1], (self.N+1-(ref_idx[1]-ref_idx[0])))))
 
                 if self.state_prediction is None:
                     Z_ws = Z_ref
                     U_ws = np.zeros((self.N, self.n_u))
                 else:
                     Z_ws = np.vstack((self.state_prediction[1:],
-                        self.dynamics.f_dt(self.state_prediction[-1], self.ev_input_prediction[-1], type='numpy')))
+                        self.dynamics.f_dt(self.state_prediction[-1], self.input_prediction[-1], type='numpy')))
                     U_ws = np.vstack((self.input_prediction[1:],
                         self.input_prediction[-1]))
 
@@ -145,8 +143,8 @@ class trackingControlNode(object):
                 if not status_sol['success']:
                     rospy.loginfo('TRACKING: MPC not feasible')
 
-            self.ev_state_prediction = Z_pred
-            self.ev_input_prediction = U_pred
+            self.state_prediction = Z_pred
+            self.input_prediction = U_pred
 
             self.last_input = U_pred[0]
 
@@ -160,6 +158,8 @@ class trackingControlNode(object):
             pred_msg.y = Z_pred[:,1]
             pred_msg.psi = Z_pred[:,2]
             pred_msg.v = Z_pred[:,3]
+            pred_msg.df = U_pred[:,0]
+            pred_msg.a = U_pred[:,1]
             self.pred_pub.publish(pred_msg)
 
             counter += 1
