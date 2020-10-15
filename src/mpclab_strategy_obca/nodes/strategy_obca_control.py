@@ -3,6 +3,7 @@
 import rospy
 from bondpy import bondpy
 import numpy as np
+import numpy.linalg as la
 
 from barc.msg import ECU, States, Prediction
 
@@ -217,7 +218,7 @@ class strategyOBCAControlNode(object):
             # Predict strategy to use
             scores = self.strategy_predictor.predict(rel_state.flatten(order='F'))
             print(scores)
-            exp_state = experimentStates(t=t, EV_curr=EV_state, TV_pred=TV_pred, score=scores)
+            exp_state = experimentStates(t=t, EV_curr=EV_state, TV_pred=TV_pred, score=scores, ref_col=[False for _ in range(self.N+1)])
             self.state_machine.state_transition(exp_state)
 
             if self.state_machine.state == 'End':
@@ -272,9 +273,9 @@ class strategyOBCAControlNode(object):
             if status_ws['success'] and status_sol['success']:
                 feasible = True
                 collision = False
-                rospy.loginfo('OBCA MPC not feasible, activating safety controller')
             else:
                 feasible = False
+                rospy.loginfo('OBCA MPC not feasible, activating safety controller')
             exp_state.feas = feasible
             self.state_machine.state_transition(exp_state)
 
