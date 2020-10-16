@@ -135,37 +135,39 @@ class trackingControlNode(object):
 
             x, y, heading, v = state
 
-            if counter >= self.traj_len-(self.N+1):
-                U_pred = np.zeros((self.N, self.n_u))
-                Z_pred = np.tile(self.trajectory[-1], (self.N+1,1))
+            if counter >= self.traj_len - 1:
+                Z_ref = np.tile(self.trajectory[-1], (self.N+1,1))
                 rospy.loginfo('TRACKING: End of trajectory reached')
+            elif counter >= self.traj_len - (self.N+1):
+                Z_ref = np.vstack((self.trajectory[counter:], np.tile(self.trajectory[-1], ((self.N+1)-(self.traj_len-counter),1))))
             else:
-                ref_idx = [min(counter, self.traj_len-1), min(counter+self.N+1,self.traj_len)]
-                Z_ref = self.trajectory[ref_idx[0]:ref_idx[1]]
+                Z_ref = self.trajectory[counter:counter+self.N+1]
 
-                if self.state_prediction is None:
-                    Z_ws = Z_ref
-                    U_ws = np.zeros((self.N, self.n_u))
-                else:
-                    Z_ws = np.vstack((self.state_prediction[1:],
-                        self.dynamics.f_dt(self.state_prediction[-1], self.input_prediction[-1], type='numpy')))
-                    U_ws = np.vstack((self.input_prediction[1:],
-                        self.input_prediction[-1]))
+            if self.state_prediction is None:
+                Z_ws = Z_ref
+                U_ws = np.zeros((self.N, self.n_u))
+            else:
+                Z_ws = np.vstack((self.state_prediction[1:],
+                    self.dynamics.f_dt(self.state_prediction[-1], self.input_prediction[-1], type='numpy')))
+                U_ws = np.vstack((self.input_prediction[1:],
+                    self.input_prediction[-1]))
 
-                Z_pred, U_pred, status_sol = self.tracking_controller.solve(state, self.last_input, Z_ref, Z_ws, U_ws)
+            Z_pred, U_pred, status_sol = self.tracking_controller.solve(state, self.last_input, Z_ref, Z_ws, U_ws)
 
-                if not status_sol['success']:
-                    rospy.loginfo('TRACKING: MPC not feasible')
+            ecu_msg = ECU()
+            if not status_sol['success']:
+                rospy.loginfo('TRACKING: MPC not feasible')
+                ecu_msg.servo = 0.0
+                ecu_msg.motor = 0.0
+            else:
+                ecu_msg.servo = U_pred[0,0]
+                ecu_msg.motor = U_pred[0,1]
+            self.ecu_pub.publish(ecu_msg)
 
             self.state_prediction = Z_pred
             self.input_prediction = U_pred
 
             self.last_input = U_pred[0]
-
-            ecu_msg = ECU()
-            ecu_msg.servo = U_pred[0,0]
-            ecu_msg.motor = U_pred[0,1]
-            self.ecu_pub.publish(ecu_msg)
 
             pred_msg = Prediction()
             pred_msg.x = Z_pred[:,0]
