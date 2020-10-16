@@ -59,7 +59,7 @@ class trackingControlNode(object):
         rospy.set_param('/'.join((vehicle_ns,'car/car_init/z')), 0.0)
         rospy.set_param('/'.join((vehicle_ns,'car/car_init/heading')), float(self.trajectory[0,2]))
         # rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), float(self.trajectory[0,3]))
-        ospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), 0.0)
+        rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), 0.0)
 
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
         self.dynamics = bike_dynamics_rk4(dyn_params)
