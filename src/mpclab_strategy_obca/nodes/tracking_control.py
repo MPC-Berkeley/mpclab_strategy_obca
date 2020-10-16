@@ -50,7 +50,7 @@ class trackingControlNode(object):
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
 
-        self.scaling_factor = 1/15
+        self.scaling_factor = 1/7
         self.trajectory = np.multiply(load_vehicle_trajectory(self.trajectory_file), np.array([self.scaling_factor, self.scaling_factor, 1, self.scaling_factor]))
         self.traj_len = self.trajectory.shape[0]
 
@@ -58,7 +58,8 @@ class trackingControlNode(object):
         rospy.set_param('/'.join((vehicle_ns,'car/car_init/y')), float(self.trajectory[0,1]))
         rospy.set_param('/'.join((vehicle_ns,'car/car_init/z')), 0.0)
         rospy.set_param('/'.join((vehicle_ns,'car/car_init/heading')), float(self.trajectory[0,2]))
-        rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), float(self.trajectory[0,3]))
+        # rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), float(self.trajectory[0,3]))
+        ospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), 0.0)
 
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
         self.dynamics = bike_dynamics_rk4(dyn_params)
@@ -101,6 +102,8 @@ class trackingControlNode(object):
 
     def spin(self):
         rospy.sleep(self.init_time)
+
+        rospy.loginfo('============ Controler START ============')
         self.start_time = rospy.get_rostime().to_sec()
         counter = 0
 
@@ -115,6 +118,7 @@ class trackingControlNode(object):
 
                 self.bond_log.break_bond()
                 self.bond_ard.break_bond()
+                rospy.loginfo('============ Controler SHUTTING DOWN ============')
                 rospy.signal_shutdown('Max time of %g reached, controller shutting down...' % self.max_time)
 
             state = self.state
