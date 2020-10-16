@@ -99,6 +99,46 @@ void mexFunction( solver_int32_default nlhs, mxArray *plhs[], solver_int32_defau
 	}
 
 	/* copy parameters into the right location */
+	par = mxGetField(PARAMS, 0, "lb");
+#ifdef MEXARGMUENTCHECKS
+    if( par == NULL )	
+	{
+        mexErrMsgTxt("PARAMS.lb not found");
+    }
+    if( !mxIsDouble(par) )
+    {
+    mexErrMsgTxt("PARAMS.lb must be a double.");
+    }
+    if( mxGetM(par) != 398 || mxGetN(par) != 1 ) 
+	{
+    mexErrMsgTxt("PARAMS.lb must be of size [398 x 1]");
+    }
+#endif	 
+	if ( (mxGetN(par) != 0) && (mxGetM(par) != 0) )
+	{
+		copyMArrayToC_double(mxGetPr(par), params.lb,398);
+
+	}
+	par = mxGetField(PARAMS, 0, "ub");
+#ifdef MEXARGMUENTCHECKS
+    if( par == NULL )	
+	{
+        mexErrMsgTxt("PARAMS.ub not found");
+    }
+    if( !mxIsDouble(par) )
+    {
+    mexErrMsgTxt("PARAMS.ub must be a double.");
+    }
+    if( mxGetM(par) != 398 || mxGetN(par) != 1 ) 
+	{
+    mexErrMsgTxt("PARAMS.ub must be of size [398 x 1]");
+    }
+#endif	 
+	if ( (mxGetN(par) != 0) && (mxGetM(par) != 0) )
+	{
+		copyMArrayToC_double(mxGetPr(par), params.ub,398);
+
+	}
 	par = mxGetField(PARAMS, 0, "x0");
 #ifdef MEXARGMUENTCHECKS
     if( par == NULL )	
@@ -109,14 +149,14 @@ void mexFunction( solver_int32_default nlhs, mxArray *plhs[], solver_int32_defau
     {
     mexErrMsgTxt("PARAMS.x0 must be a double.");
     }
-    if( mxGetM(par) != 304 || mxGetN(par) != 1 ) 
+    if( mxGetM(par) != 404 || mxGetN(par) != 1 ) 
 	{
-    mexErrMsgTxt("PARAMS.x0 must be of size [304 x 1]");
+    mexErrMsgTxt("PARAMS.x0 must be of size [404 x 1]");
     }
 #endif	 
 	if ( (mxGetN(par) != 0) && (mxGetM(par) != 0) )
 	{
-		copyMArrayToC_double(mxGetPr(par), params.x0,304);
+		copyMArrayToC_double(mxGetPr(par), params.x0,404);
 
 	}
 	par = mxGetField(PARAMS, 0, "xinit");
@@ -129,14 +169,14 @@ void mexFunction( solver_int32_default nlhs, mxArray *plhs[], solver_int32_defau
     {
     mexErrMsgTxt("PARAMS.xinit must be a double.");
     }
-    if( mxGetM(par) != 4 || mxGetN(par) != 1 ) 
+    if( mxGetM(par) != 6 || mxGetN(par) != 1 ) 
 	{
-    mexErrMsgTxt("PARAMS.xinit must be of size [4 x 1]");
+    mexErrMsgTxt("PARAMS.xinit must be of size [6 x 1]");
     }
 #endif	 
 	if ( (mxGetN(par) != 0) && (mxGetM(par) != 0) )
 	{
-		copyMArrayToC_double(mxGetPr(par), params.xinit,4);
+		copyMArrayToC_double(mxGetPr(par), params.xinit,6);
 
 	}
 	par = mxGetField(PARAMS, 0, "all_parameters");
@@ -149,14 +189,14 @@ void mexFunction( solver_int32_default nlhs, mxArray *plhs[], solver_int32_defau
     {
     mexErrMsgTxt("PARAMS.all_parameters must be a double.");
     }
-    if( mxGetM(par) != 204 || mxGetN(par) != 1 ) 
+    if( mxGetM(par) != 608 || mxGetN(par) != 1 ) 
 	{
-    mexErrMsgTxt("PARAMS.all_parameters must be of size [204 x 1]");
+    mexErrMsgTxt("PARAMS.all_parameters must be of size [608 x 1]");
     }
 #endif	 
 	if ( (mxGetN(par) != 0) && (mxGetM(par) != 0) )
 	{
-		copyMArrayToC_double(mxGetPr(par), params.all_parameters,204);
+		copyMArrayToC_double(mxGetPr(par), params.all_parameters,608);
 
 	}
 
@@ -186,204 +226,204 @@ void mexFunction( solver_int32_default nlhs, mxArray *plhs[], solver_int32_defau
 
 	/* copy output to matlab arrays */
 	plhs[0] = mxCreateStructMatrix(1, 1, 51, outputnames);
-		outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x01, mxGetPr(outvar), 6);
+		outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x01, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x01", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x02, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x02, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x02", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x03, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x03, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x03", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x04, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x04, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x04", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x05, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x05, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x05", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x06, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x06, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x06", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x07, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x07, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x07", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x08, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x08, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x08", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x09, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x09, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x09", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x10, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x10, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x10", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x11, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x11, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x11", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x12, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x12, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x12", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x13, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x13, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x13", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x14, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x14, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x14", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x15, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x15, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x15", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x16, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x16, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x16", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x17, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x17, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x17", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x18, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x18, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x18", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x19, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x19, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x19", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x20, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x20, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x20", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x21, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x21, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x21", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x22, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x22, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x22", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x23, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x23, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x23", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x24, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x24, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x24", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x25, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x25, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x25", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x26, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x26, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x26", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x27, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x27, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x27", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x28, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x28, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x28", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x29, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x29, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x29", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x30, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x30, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x30", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x31, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x31, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x31", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x32, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x32, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x32", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x33, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x33, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x33", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x34, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x34, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x34", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x35, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x35, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x35", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x36, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x36, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x36", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x37, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x37, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x37", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x38, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x38, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x38", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x39, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x39, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x39", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x40, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x40, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x40", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x41, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x41, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x41", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x42, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x42, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x42", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x43, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x43, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x43", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x44, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x44, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x44", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x45, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x45, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x45", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x46, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x46, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x46", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x47, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x47, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x47", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x48, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x48, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x48", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x49, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x49, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x49", outvar);
 
-	outvar = mxCreateDoubleMatrix(6, 1, mxREAL);
-	copyCArrayToM_double( output.x50, mxGetPr(outvar), 6);
+	outvar = mxCreateDoubleMatrix(8, 1, mxREAL);
+	copyCArrayToM_double( output.x50, mxGetPr(outvar), 8);
 	mxSetField(plhs[0], 0, "x50", outvar);
 
 	outvar = mxCreateDoubleMatrix(4, 1, mxREAL);

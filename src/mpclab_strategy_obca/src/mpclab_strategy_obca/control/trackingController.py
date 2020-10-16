@@ -37,7 +37,10 @@ class trackingController(abstractController):
 
 		self.Q = params.Q
 		self.R = params.R
+		self.R_d = params.R_d
 
+		self.z_l = params.z_l
+		self.z_u = params.z_u
 		self.u_l = params.u_l
 		self.u_u = params.u_u
 		self.du_l = params.du_l
@@ -52,19 +55,31 @@ class trackingController(abstractController):
 	def solve(self, z_s, u_prev, z_ref, z_ws, u_ws):
 		x0 = []
 		params = []
+		ub = []
+		lb = []
 
 		for k in range(self.N+1):
-			params.append( z_ref[k, :] )
-
 			if k == self.N:
-				x0.append( z_ws[k, :] )
+				x0.append(z_ws[k, :])
+				ub.append(self.z_u)
+				lb.append(self.z_l)
+				params.extend((z_ref[k, :], self.Q))
+			elif k == 0:
+				x0.extend((z_ws[k, :], u_ws[k, :], u_prev))
+				ub.append(self.u_u)
+				lb.append(self.u_l)
+				params.extend((z_ref[k, :], self.Q, self.R, self.R_d))
 			else:
-				x0.append( z_ws[k, :] )
-				x0.append( u_ws[k, :] )
+				x0.extend((z_ws[k, :], u_ws[k, :], u_ws[k, :]))
+				ub.extend((self.z_u, self.u_u, self.u_u))
+				lb.extend((self.z_l, self.u_l, self.u_l))
+				params.extend((z_ref[k, :], self.Q, self.R, self.R_d))
 
 		problem = {"x0": np.hstack(x0),
 					"all_parameters": np.hstack(params),
-					"xinit": z_s}
+					"xinit": np.hstack((z_s, u_prev)),
+					"ub": np.hstack(ub),
+					"lb": np.hstack(lb)}
 
 		output, exitflag, info = self.tracking_solver.solve(problem)
 

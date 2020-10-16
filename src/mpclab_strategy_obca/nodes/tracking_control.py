@@ -25,6 +25,14 @@ class trackingControlNode(object):
         self.dt = rospy.get_param('controller/dt')
         self.init_time = rospy.get_param('controller/init_time')
         self.max_time = rospy.get_param('controller/max_time')
+        self.x_max = rospy.get_param('controller/x_max')
+        self.x_min = rospy.get_param('controller/x_min')
+        self.y_max = rospy.get_param('controller/y_max')
+        self.y_min = rospy.get_param('controller/y_min')
+        self.heading_max = rospy.get_param('controller/heading_max')
+        self.heading_min = rospy.get_param('controller/heading_min')
+        self.v_max = rospy.get_param('controller/v_max')
+        self.v_min = rospy.get_param('controller/v_min')
         self.accel_max = rospy.get_param('controller/accel_max')
         self.accel_min = rospy.get_param('controller/accel_min')
         self.steer_max = rospy.get_param('controller/steer_max')
@@ -39,8 +47,9 @@ class trackingControlNode(object):
         self.n_x = rospy.get_param('controller/tracking/n')
         self.n_u = rospy.get_param('controller/tracking/d')
         self.N = rospy.get_param('controller/tracking/N')
-        self.Q = np.diag(rospy.get_param('controller/tracking/Q'))
-        self.R = np.diag(rospy.get_param('controller/tracking/R'))
+        self.Q = rospy.get_param('controller/tracking/Q')
+        self.R = rospy.get_param('controller/tracking/R')
+        self.R_d = rospy.get_param('controller/tracking/R_d')
         self.optlevel = rospy.get_param('controller/tracking/optlevel')
 
         self.L_r = rospy.get_param('controller/dynamics/L_r')
@@ -65,7 +74,8 @@ class trackingControlNode(object):
         self.dynamics = bike_dynamics_rk4(dyn_params)
 
         tracking_params = trackingParams(dt=self.dt, N=self.N, n=self.n_x, d=self.n_u,
-            Q=self.Q, R=self.R,
+            Q=self.Q, R=self.R, R_d=self.R_d,
+            z_l=np.array([self.x_min, self.y_min, self.heading_min, self.v_min]), z_u=np.array([self.x_max, self.y_max, self.heading_max, self.v_max]),
             u_l=np.array([self.steer_min,self.accel_min]), u_u=np.array([self.steer_max,self.accel_max]),
             du_l=np.array([self.dsteer_min,self.daccel_min]), du_u=np.array([self.dsteer_max,self.daccel_max]),
             optlevel=self.optlevel)
