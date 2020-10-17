@@ -3,6 +3,7 @@
 import rospy
 from bondpy import bondpy
 import numpy as np
+import numpy.linalg as la
 
 from barc.msg import ECU, States, Prediction
 
@@ -157,6 +158,10 @@ class trackingControlNode(object):
             ecu_msg = ECU()
             if not status_sol['success']:
                 rospy.loginfo('TRACKING: MPC not feasible')
+                ecu_msg.servo = 0.0
+                ecu_msg.motor = 0.0
+            elif la.norm(np.array([x,y])-self.trajectory[-1,:2]) <= 0.10:
+                rospy.loginfo('TRACKING: Terminal position reached')
                 ecu_msg.servo = 0.0
                 ecu_msg.motor = 0.0
             else:
