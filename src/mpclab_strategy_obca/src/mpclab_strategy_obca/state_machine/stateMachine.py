@@ -6,6 +6,18 @@ import numpy.linalg as la
 from mpclab_strategy_obca.utils.types import experimentParams
 from mpclab_strategy_obca.utils.types import experimentStates
 
+state_num_dict = {'Start' : -1,
+    'End' : -2,
+    'Free-Driving' : 0,
+    'Safe-Confidence' : 1,
+    'Safe-Yield' : 2,
+    'Safe-Infeasible' : 3,
+    'HOBCA-Unlocked' : 4,
+    'HOBCA-Locked' : 5,
+    'Emergency-Break' : 6}
+
+num_state_dict = {v: k for k, v in state_num_dict.items()}
+
 class stateMachine(object):
 
     def __init__(self, params=experimentParams()):

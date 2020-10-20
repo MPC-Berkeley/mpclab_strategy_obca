@@ -5,6 +5,7 @@ from bondpy import bondpy
 import numpy as np
 
 from barc.msg import ECU, States, Prediction
+from mpclab_strategy_obca.msg import FSMState
 
 from mpclab_strategy_obca.control.OBCAController import NaiveOBCAParameterizedController
 from mpclab_strategy_obca.control.safetyController import safetyController, emergencyController
@@ -115,6 +116,9 @@ class naiveOBCAParameterizedControlNode(object):
         self.ecu_pub = rospy.Publisher('ecu', ECU, queue_size=1)
         # Publisher for mpc prediction
         self.pred_pub = rospy.Publisher('pred_states', Prediction, queue_size=1)
+        # Publisher for FSM state
+        self.fsm_state_pub = rospy.Publisher('fsm_state', FSMState, queue_size=1)
+
         # Publisher for data logger
         # self.log_pub = rospy.Publisher('log_states', States, queue_size=1)
 
@@ -201,6 +205,13 @@ class naiveOBCAParameterizedControlNode(object):
             else:
                 Z_pred, U_pred = Z_obca, U_obca
 
+            if obca_mpc_ebrake:
+                fsm_state = 'Emergency-Break'
+            elif obca_mpc_safety:
+                fsm_state = 'Safe-Infeasible'
+            else:
+                fsm_state = 'HOBCA-Unlocked'
+
             self.ev_state_prediction = Z_pred
             self.ev_input_prediction = U_pred
 
@@ -219,6 +230,10 @@ class naiveOBCAParameterizedControlNode(object):
             pred_msg.df = U_pred[:,0]
             pred_msg.a = U_pred[:,1]
             self.pred_pub.publish(pred_msg)
+
+            fsm_state_msg = FSMState()
+            fsm_state_msg.fsm_state = fsm_state
+            self.fsm_state_pub.publish(fsm_state_msg)
 
             self.rate.sleep()
 
