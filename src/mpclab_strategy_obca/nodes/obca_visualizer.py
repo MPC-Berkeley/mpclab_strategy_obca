@@ -19,10 +19,7 @@ def main():
 	plot_subplots = rospy.get_param('/visualization/plot_subplots', True)
 	plot_sim      = rospy.get_param('/visualization/plot_sim', True)
 	plot_est      = rospy.get_param('/visualization/plot_est', True)
-	plot_state    = rospy.get_param('/visualization/plot_state', False)
-	plot_score    = rospy.get_param('/visualization/plot_score', False)
-	plot_pred    = rospy.get_param('/visualization/plot_pred', False)
-	global_pred    = rospy.get_param('/visualization/global_pred', True)
+
 	namespaces = rospy.get_param('/visualization/namespaces')
 	colors = rospy.get_param('/visualization/colors')
 	trajectory_file = rospy.get_param('/target_vehicle/controller/trajectory_file', None)
@@ -52,10 +49,14 @@ def main():
 		d = {'car_width' : rospy.get_param(n + '/car/plot/W'), 'car_length' : rospy.get_param(n + '/car/plot/L')}
 		plot_state = rospy.get_param(n + '/controller/plot_state')
 		plot_score = rospy.get_param(n + '/controller/plot_score')
+		plot_pred    = rospy.get_param(n + '/controller/plot_pred')
+		global_pred    = rospy.get_param(n + '/controller/global_pred')
 		p = plotterParams(plot_state=plot_state, plot_score=plot_score,
 			plot_pred=plot_pred, global_pred=global_pred)
 		vis.attach_plotter(n, c, d, p)
 
+	rospy.sleep(1.0)
+	
 	while not rospy.is_shutdown():
 		# Update the plot
 		vis.update()
