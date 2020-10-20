@@ -43,7 +43,7 @@ class trackingControlNode(object):
         self.dsteer_max = rospy.get_param('controller/dsteer_max')
         self.dsteer_min = rospy.get_param('controller/dsteer_min')
         self.lanewidth = rospy.get_param('controller/lanewidth')
-        self.trajectory_file = rospy.get_param('controller/trajectory_file')
+        self.trajectory_file = rospy.get_param('controller/trajectory_file', None)
 
         self.n_x = rospy.get_param('controller/tracking/n')
         self.n_u = rospy.get_param('controller/tracking/d')
@@ -60,16 +60,34 @@ class trackingControlNode(object):
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
 
-        self.scaling_factor = 1/7
-        self.trajectory = np.multiply(load_vehicle_trajectory(self.trajectory_file), np.array([self.scaling_factor, self.scaling_factor, 1, self.scaling_factor]))
-        self.traj_len = self.trajectory.shape[0]
+        if self.trajectory_file is not None:
+            # Load reference trajectory from file and set initial conditions
+            self.scaling_factor = 1/7
+            self.trajectory = np.multiply(load_vehicle_trajectory(self.trajectory_file), np.array([self.scaling_factor, self.scaling_factor, 1, self.scaling_factor]))
+            self.traj_len = self.trajectory.shape[0]
+            rospy.set_param('/'.join((vehicle_ns,'car/car_init/x')), float(self.trajectory[0,0]))
+            rospy.set_param('/'.join((vehicle_ns,'car/car_init/y')), float(self.trajectory[0,1]))
+            rospy.set_param('/'.join((vehicle_ns,'car/car_init/z')), 0.0)
+            rospy.set_param('/'.join((vehicle_ns,'car/car_init/heading')), float(self.trajectory[0,2]))
+            rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), 0.0)
+        else:
+            # Generate simple reference trajectory
+            self.traj_len = rospy.get_param('controller/tracking/T')
+            v_ref = rospy.get_param('controller/tracking/v_ref')
+            y_ref = rospy.get_param('controller/tracking/y_ref')
+            x_init = rospy.get_param('car/car_init/x')
+            y_init = rospy.get_param('car/car_init/y')
+            heading_init = rospy.get_param('car/car_init/heading')
+            if type(heading_init) is str:
+                heading_init = eval(heading_init)
 
-        rospy.set_param('/'.join((vehicle_ns,'car/car_init/x')), float(self.trajectory[0,0]))
-        rospy.set_param('/'.join((vehicle_ns,'car/car_init/y')), float(self.trajectory[0,1]))
-        rospy.set_param('/'.join((vehicle_ns,'car/car_init/z')), 0.0)
-        rospy.set_param('/'.join((vehicle_ns,'car/car_init/heading')), float(self.trajectory[0,2]))
-        # rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), float(self.trajectory[0,3]))
-        rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), 0.0)
+            # x_ref = x_init + v_ref*np.cos(heading_init)*np.arange(0, self.traj_len*self.dt, self.dt)
+            x_ref = np.zeros(self.traj_len)
+            y_ref = y_ref*np.ones(self.traj_len)
+            heading_ref = heading_init*np.ones(self.traj_len)
+            v_ref = v_ref*np.ones(self.traj_len)
+
+            self.trajectory = np.vstack((x_ref, y_ref, heading_ref, v_ref)).T
 
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
         self.dynamics = bike_dynamics_rk4(dyn_params)
