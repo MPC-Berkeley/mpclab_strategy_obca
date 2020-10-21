@@ -44,6 +44,7 @@ class trackingControlNode(object):
         self.dsteer_min = rospy.get_param('controller/dsteer_min')
         self.lanewidth = rospy.get_param('controller/lanewidth')
         self.trajectory_file = rospy.get_param('controller/trajectory_file', None)
+        self.scaling_factor = rospy.get_param('controller/scaling_factor', 1.0)
 
         self.n_x = rospy.get_param('controller/tracking/n')
         self.n_u = rospy.get_param('controller/tracking/d')
@@ -62,7 +63,6 @@ class trackingControlNode(object):
 
         if self.trajectory_file is not None:
             # Load reference trajectory from file and set initial conditions
-            self.scaling_factor = 1/7
             self.trajectory = np.multiply(load_vehicle_trajectory(self.trajectory_file), np.array([self.scaling_factor, self.scaling_factor, 1, self.scaling_factor]))
             self.traj_len = self.trajectory.shape[0]
             rospy.set_param('/'.join((vehicle_ns,'car/car_init/x')), float(self.trajectory[0,0]))

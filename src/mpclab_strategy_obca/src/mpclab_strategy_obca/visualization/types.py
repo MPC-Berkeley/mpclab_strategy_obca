@@ -22,6 +22,7 @@ class visualizerParams(PythonMsg):
     plot_sensor: bool = field(default=False)
 
     trajectory_file: str = field(default=None)
+    scaling_factor: float = field(default=1.0)
 
 @dataclass
 class plotterParams(PythonMsg):

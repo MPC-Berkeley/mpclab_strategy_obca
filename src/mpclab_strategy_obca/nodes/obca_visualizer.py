@@ -23,6 +23,7 @@ def main():
 	namespaces = rospy.get_param('/visualization/namespaces')
 	colors = rospy.get_param('/visualization/colors')
 	trajectory_file = rospy.get_param('/target_vehicle/controller/trajectory_file', None)
+	scaling_factor = rospy.get_param('/target_vehicle/controller/scaling_factor', 1.0)
 
 	dt = rospy.get_param('/visualization/dt')
 	loop_rate = 1.0/dt
@@ -43,7 +44,7 @@ def main():
 
 	vis_params = visualizerParams(dt=dt, plot_subplots=plot_subplots,
 		plot_sim=plot_sim, plot_est=plot_est,
-		trajectory_file=trajectory_file)
+		trajectory_file=trajectory_file, scaling_factor=scaling_factor)
 	vis = barcOBCAVisualizer(track, vis_params)
 	for (n, c) in zip(namespaces, colors):
 		d = {'car_width' : rospy.get_param(n + '/car/plot/W'), 'car_length' : rospy.get_param(n + '/car/plot/L')}
@@ -56,7 +57,7 @@ def main():
 		vis.attach_plotter(n, c, d, p)
 
 	rospy.sleep(1.0)
-	
+
 	while not rospy.is_shutdown():
 		# Update the plot
 		vis.update()

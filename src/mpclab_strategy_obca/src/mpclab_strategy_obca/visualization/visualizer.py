@@ -38,7 +38,7 @@ class barcOBCAVisualizer(object):
         self.axs = dict()
 
         if params.trajectory_file is not None:
-            scaling_factor = 1/7
+            scaling_factor = params.scaling_factor
             trajectory = np.multiply(load_vehicle_trajectory(params.trajectory_file), np.array([scaling_factor, scaling_factor, 1, scaling_factor]))
 
         ################ Trajectory Subplot ################
