@@ -47,7 +47,7 @@ class strategyPredictor(abstractStrategyPredictor):
 if __name__ == '__main__':
     import pdb
 
-    strat_params = strategyPredictorParams(nn_model_file='/home/mpcbarc/strategy_classification_models/nn_strategy_TF-trainscg_h-40_AC-tansig_ep2000_CE0.17453_2020-08-04_15-42.mat',
+    strat_params = strategyPredictorParams(nn_model_file='/home/mpcbarc/strategy_classification_models/nn_strategy_barc_TF-trainscg_h-40_AC-tansig_ep2000_CE0.17672_2020-10-17_21-13.mat',
         smooth_prediction=False)
     strat_pred = strategyPredictor(strat_params)
 

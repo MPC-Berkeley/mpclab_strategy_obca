@@ -143,7 +143,7 @@ class naiveOBCAParameterizedControlNode(object):
         self.start_time = rospy.get_rostime().to_sec()
 
         while not rospy.is_shutdown():
-            t = rospy.get_rostime().to_sec()
+            t = rospy.get_rostime().to_sec() - self.start_time
             ecu_msg = ECU()
 
             if t-self.start_time >= self.max_time:

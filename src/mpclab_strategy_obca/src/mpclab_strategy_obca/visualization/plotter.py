@@ -335,11 +335,11 @@ class barcOBCAPlotter(object):
                 self.score_his['left'].append(self.data.scores[0])
                 self.score_his['right'].append(self.data.scores[1])
                 self.score_his['yield'].append(self.data.scores[2])
-            self.line_scores['left'].set_data(self.score_his['left'])
-            self.line_scores['right'].set_data(self.score_his['right'])
-            self.line_scores['yield'].set_data(self.score_his['yield'])
+            self.line_scores['left'].set_data(range(len(self.score_his['left'])), self.score_his['left'])
+            self.line_scores['right'].set_data(range(len(self.score_his['right'])), self.score_his['right'])
+            self.line_scores['yield'].set_data(range(len(self.score_his['yield'])), self.score_his['yield'])
             self.axscore.set_ylim(0, 1)
-            self.axstate.set_xlim(0, len(self.score_his['left']))
+            self.axscore.set_xlim(0, len(self.score_his['left']))
 
     def getCarPosition(self, states):
         x     = states.x

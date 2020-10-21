@@ -6,6 +6,7 @@ import numpy as np
 import numpy.linalg as la
 
 from barc.msg import ECU, States, Prediction
+from mpclab_strategy_obca.msg import FSMState, Scores
 
 from mpclab_strategy_obca.control.OBCAController import StrategyOBCAController
 from mpclab_strategy_obca.control.safetyController import safetyController, emergencyController
@@ -140,12 +141,16 @@ class strategyOBCAControlNode(object):
         self.ev_input_prediction = None
 
         rospy.Subscriber('est_states', States, self.estimator_callback, queue_size=1)
-        rospy.Subscriber('/target_vehicle/prediction', Prediction, self.prediction_callback, queue_size=1)
+        rospy.Subscriber('/target_vehicle/pred_states', Prediction, self.prediction_callback, queue_size=1)
 
         # Publisher for steering and motor control
         self.ecu_pub = rospy.Publisher('ecu', ECU, queue_size=1)
         # Publisher for mpc prediction
         self.pred_pub = rospy.Publisher('pred_states', Prediction, queue_size=1)
+        # Publisher for FSM state
+        self.fsm_state_pub = rospy.Publisher('fsm_state', FSMState, queue_size=1)
+        # Publisher for FSM state
+        self.score_pub = rospy.Publisher('strategy_scores', Scores, queue_size=1)
         # Publisher for data logger
         # self.log_pub = rospy.Publisher('log_states', States, queue_size=1)
 
@@ -173,7 +178,7 @@ class strategyOBCAControlNode(object):
             t = rospy.get_rostime().to_sec() - self.start_time
             ecu_msg = ECU()
 
-            if t-self.start_time >= self.max_time:
+            if t >= self.max_time:
                 end_msg = 'Max time of %g reached, controller shutting down...' % self.max_time
                 self.task_finished = True
             elif self.state_machine.state == 'End':
@@ -187,6 +192,7 @@ class strategyOBCAControlNode(object):
 
                 self.bond_log.break_bond()
                 self.bond_ard.break_bond()
+                rospy.loginfo(end_msg)
                 rospy.signal_shutdown(end_msg)
 
             EV_state = self.state
@@ -217,7 +223,6 @@ class strategyOBCAControlNode(object):
 
             # Predict strategy to use
             scores = self.strategy_predictor.predict(rel_state.flatten(order='F'))
-            print(scores)
             exp_state = experimentStates(t=t, EV_curr=EV_state, TV_pred=TV_pred, score=scores, ref_col=[False for _ in range(self.N+1)])
             self.state_machine.state_transition(exp_state)
 
@@ -327,6 +332,14 @@ class strategyOBCAControlNode(object):
             pred_msg.df = U_pred[:,0]
             pred_msg.a = U_pred[:,1]
             self.pred_pub.publish(pred_msg)
+
+            score_msg = Scores()
+            score_msg.scores = scores
+            self.score_pub.publish(score_msg)
+
+            fsm_state_msg = FSMState()
+            fsm_state_msg.fsm_state = self.state_machine.state
+            self.fsm_state_pub.publish(fsm_state_msg)
 
             self.rate.sleep()
 
