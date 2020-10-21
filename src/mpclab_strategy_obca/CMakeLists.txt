@@ -162,6 +162,7 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   nodes/strategy_obca_control.py
+  nodes/strategy_obca_param_control.py
   nodes/naive_obca_control.py
   nodes/naive_obca_param_control.py
   nodes/tracking_control.py

@@ -18,6 +18,7 @@ from mpclab_strategy_obca.control.utils.opt_solver_strat.interface.opt_solver_st
 from mpclab_strategy_obca.control.utils.ws_solver_naive.interface.ws_solver_naive_py import ws_solver_naive_solve
 from mpclab_strategy_obca.control.utils.opt_solver_naive.interface.opt_solver_naive_py import opt_solver_naive_solve
 from mpclab_strategy_obca.control.utils.opt_solver_naive_param.interface.opt_solver_naive_py import opt_solver_naive_solve as opt_solver_naive_param_solve
+from mpclab_strategy_obca.control.utils.opt_solver_strat_param.interface.opt_solver_strat_py import opt_solver_strat_solve as opt_solver_strat_param_solve
 
 class MatlabFPSolver(object):
 	"""
@@ -692,6 +693,177 @@ class NaiveOBCAController(abstractController):
 
 		return z_pred, u_pred, status
 
+class StrategyOBCAParameterizedController(abstractController):
+	def __init__(self, dynamics, params=strategyOBCAParams()):
+		self.dynamics = dynamics
+
+		self.dt = params.dt
+
+		self.n_x = params.n
+		self.n_u = params.d
+
+		self.N = params.N
+
+		self.n_obs = params.n_obs
+		self.n_ineq = params.n_ineq # Number of constraints for each obstacle
+		self.d_ineq = params.d_ineq # Dimension of constraints for all obstacles
+
+		self.G = params.G
+		self.g = params.g
+		self.m_ineq = self.G.shape[0] # Number of constraints for controlled object
+
+		self.Q = params.Q
+		self.R = params.R
+		self.R_d = params.R_d
+
+		self.d_min = params.d_min
+
+		self.u_l = params.u_l
+		self.u_u = params.u_u
+		self.du_l = params.du_l
+		self.du_u = params.du_u
+
+		self.N_ineq = np.sum(self.n_ineq)
+		self.M_ineq = self.n_obs * self.m_ineq
+
+		self.optlevel = params.optlevel
+
+		self.z_ws = None
+		self.u_ws = None
+		self.lambda_ws = None
+		self.mu_ws = None
+
+		self.ws_name = params.ws_name
+		self.opt_name = params.opt_name
+
+		self.ws_solver = None
+		self.opt_solver = None
+
+	def initialize(self, regen=False):
+
+		if regen:
+			self.ws_solver = self.generate_ws_solver()
+			self.opt_solver = self.generate_opt_solver()
+		else:
+			# ==== The nominal way to call the generated solver
+			# self.ws_solver = forcespro.nlp.Solver.from_directory('./%s' % self.ws_name)
+			# self.opt_solver = forcespro.nlp.Solver.from_directory('/%s' % self.opt_name)
+
+			# ==== The hacky way to call the generated solver from MATLAB client
+			self.ws_solver = MatlabFPSolver(ws_solver_strat_solve)
+			self.opt_solver = MatlabFPSolver(opt_solver_strat_param_solve)
+
+	def solve_ws(self, z, u, obs):
+		self.z_ws = z
+		self.u_ws = u
+
+		x0 = np.zeros((self.N_ineq + self.M_ineq + self.n_obs )*(self.N + 1))
+		params = []
+		for k in range(self.N+1):
+			obs_A = []
+			obs_b = []
+			for i in range(self.n_obs):
+				obs_A.append( obs[i][k]["A"].flatten(order='F') )
+				obs_b.append( obs[i][k]["b"].flatten(order='F') )
+
+			params.extend((z[k, :], np.hstack(obs_A), np.hstack(obs_b)))
+
+		problem = {"x0": x0,
+					"all_parameters": np.hstack(params)}
+
+		output, exitflag, info = self.ws_solver.solve(problem)
+
+		if exitflag == 1:
+			print("WS: FORCES took %d iterations and %f seconds to solve the problem.\n" %(info.it, info.solvetime) )
+			status = {"success": True,
+						"return_status": "Successfully Solved",
+						"solve_time": info.solvetime}
+
+			l_ws = np.zeros((self.N+1, self.N_ineq))
+			m_ws = np.zeros((self.N+1, self.M_ineq))
+
+			for k in range(self.N+1):
+				sol = output["x%02d" % (k+1)]
+				j = 0
+
+				for i in range(self.n_obs):
+					l_ws[k, j : j+self.n_ineq[i]] = sol[j : j+self.n_ineq[i]]
+					m_ws[k, i*self.m_ineq : (i+1)*self.m_ineq] = sol[self.N_ineq + i*self.m_ineq : self.N_ineq + (i+1)*self.m_ineq]
+
+					j += self.n_ineq[i]
+
+			self.lambda_ws = l_ws
+			self.mu_ws = m_ws
+		else:
+			print("WS: Solving Failed, exitflag = %d\n" % exitflag)
+			status = {"success": False,
+						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
+						"solve_time": None}
+
+		return status
+
+	def solve(self, z_s, u_prev, z_ref, obs, hyp):
+		x0 = []
+		params = []
+
+		for k in range(self.N+1):
+			obs_A = []
+			obs_b = []
+			for i in range(self.n_obs):
+				obs_A.append( obs[i][k]["A"].flatten(order='F') )
+				obs_b.append( obs[i][k]["b"].flatten(order='F') )
+
+			if k == self.N:
+				params.extend((z_ref[k, :], np.hstack(obs_A), np.hstack(obs_b), \
+					hyp[k]["w"], hyp[k]["b"], \
+					self.Q, self.d_min))
+
+				x0.append( self.z_ws[k, :] )
+				x0.append( self.lambda_ws[self.N-1, :] )
+				x0.append( self.mu_ws[self.N-1, :] )
+			else:
+				params.extend((z_ref[k, :], np.hstack(obs_A), np.hstack(obs_b), \
+					hyp[k]["w"], hyp[k]["b"], \
+					self.Q, self.R, self.R_d, self.d_min))
+
+				x0.append( self.z_ws[k, :] )
+				x0.append( self.lambda_ws[k, :] )
+				x0.append( self.mu_ws[k, :] )
+				x0.append( self.u_ws[k, :] )
+				x0.append( self.u_ws[k, :] )
+
+		problem = {"x0": np.hstack(x0),
+					"all_parameters": np.hstack(params),
+					"xinit": np.hstack([z_s, u_prev])}
+
+		output, exitflag, info = self.opt_solver.solve(problem)
+
+		if exitflag == 1:
+			print("OPT: FORCES took %d iterations and %f seconds to solve the problem." % (info.it,info.solvetime))
+			status = {"success": True,
+						"return_status": "Successfully Solved",
+						"solve_time": info.solvetime,
+						"info": info}
+		else:
+			print("OPT: Solving Failed, exitflag = %d\n" % exitflag)
+			status = {"success": False,
+						"return_status": 'Solving Failed, exitflag = %d' % exitflag,
+						"solve_time": None,
+						"info": info}
+
+		z_pred = np.zeros((self.N+1, self.n_x))
+		u_pred = np.zeros((self.N, self.n_u))
+
+		for k in range(self.N):
+			sol = output["x%02d" % (k+1)]
+			z_pred[k, :] = sol[:self.n_x]
+			u_pred[k, :] = sol[self.n_x + self.N_ineq + self.M_ineq : self.n_x + self.N_ineq + self.M_ineq + self.n_u]
+
+		sol = output["x%02d" % (self.N+1)]
+		z_pred[self.N, :] = sol[:self.n_x]
+
+		return z_pred, u_pred, status
+
 class NaiveOBCAParameterizedController(abstractController):
 	def __init__(self, dynamics, params=strategyOBCAParams()):
 		self.dynamics = dynamics
@@ -726,6 +898,17 @@ class NaiveOBCAParameterizedController(abstractController):
 		self.M_ineq = self.n_obs * self.m_ineq
 
 		self.optlevel = params.optlevel
+
+		self.z_ws = None
+		self.u_ws = None
+		self.lambda_ws = None
+		self.mu_ws = None
+
+		self.ws_name = params.ws_name
+		self.opt_name = params.opt_name
+
+		self.ws_solver = None
+		self.opt_solver = None
 
 	def initialize(self, regen=False):
 
@@ -804,7 +987,8 @@ class NaiveOBCAParameterizedController(abstractController):
 				obs_b.append( obs[i][k]["b"].flatten(order='F') )
 
 			if k == self.N:
-				params.extend((z_ref[k, :], np.hstack(obs_A), np.hstack(obs_b), self.Q, self.d_min))
+				params.extend((z_ref[k, :], np.hstack(obs_A), np.hstack(obs_b), \
+					self.Q, self.d_min))
 
 				x0.append( self.z_ws[k, :] )
 				x0.append( self.lambda_ws[self.N-1, :] )

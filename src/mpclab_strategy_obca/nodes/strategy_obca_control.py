@@ -222,7 +222,7 @@ class strategyOBCAControlNode(object):
             # rel_state = scale_state(rel_state, rel_range, scale, bias)
 
             # Predict strategy to use
-            scores = self.strategy_predictor.predict(rel_state.flatten(order='F'))
+            scores = self.strategy_predictor.predict(rel_state.flatten(order='C'))
             exp_state = experimentStates(t=t, EV_curr=EV_state, TV_pred=TV_pred, score=scores, ref_col=[False for _ in range(self.N+1)])
             self.state_machine.state_transition(exp_state)
 

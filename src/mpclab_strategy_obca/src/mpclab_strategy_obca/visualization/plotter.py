@@ -325,6 +325,7 @@ class barcOBCAPlotter(object):
             self.line_state.set_data(range(len(self.state_his)), self.state_his)
             self.axstate.set_ylim(self.fsm_state_ids[0], self.fsm_state_ids[-1])
             self.axstate.set_xlim(0, len(self.state_his))
+            self.axstate.grid(True, axis='y')
 
         if self.plot_score:
             if not self.data.scores:
@@ -340,6 +341,7 @@ class barcOBCAPlotter(object):
             self.line_scores['yield'].set_data(range(len(self.score_his['yield'])), self.score_his['yield'])
             self.axscore.set_ylim(0, 1)
             self.axscore.set_xlim(0, len(self.score_his['left']))
+            self.axscore.grid(True)
 
     def getCarPosition(self, states):
         x     = states.x
