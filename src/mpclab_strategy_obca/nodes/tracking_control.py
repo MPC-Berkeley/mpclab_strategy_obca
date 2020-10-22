@@ -70,6 +70,9 @@ class trackingControlNode(object):
             rospy.set_param('/'.join((vehicle_ns,'car/car_init/z')), 0.0)
             rospy.set_param('/'.join((vehicle_ns,'car/car_init/heading')), float(self.trajectory[0,2]))
             rospy.set_param('/'.join((vehicle_ns,'car/car_init/v')), 0.0)
+
+            rospy.loginfo('Initial state has been set to - X: %g, Y: %g, heading: %g, v: %g' %
+                (float(self.trajectory[0,0]), float(self.trajectory[0,1]), float(self.trajectory[0,2]), 0.0))
         else:
             # Generate simple reference trajectory
             self.traj_len = rospy.get_param('controller/tracking/T')
