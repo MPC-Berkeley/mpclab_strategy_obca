@@ -18,7 +18,7 @@ from mpclab_strategy_obca.utils.utils import load_vehicle_trajectory
 class trackingControlNode(object):
     def __init__(self):
         # Read parameter values from ROS parameter server
-        rospy.init_node('naive_obca_control')
+        rospy.init_node('tracking_control')
 
         ns = rospy.get_namespace()
         vehicle_ns = '/'.join(ns.split('/')[:-1])
@@ -43,8 +43,10 @@ class trackingControlNode(object):
         self.dsteer_max = rospy.get_param('controller/dsteer_max')
         self.dsteer_min = rospy.get_param('controller/dsteer_min')
         self.lanewidth = rospy.get_param('controller/lanewidth')
-        self.trajectory_file = rospy.get_param('controller/trajectory_file', None)
-        self.scaling_factor = rospy.get_param('controller/scaling_factor', 1.0)
+        trajectory_file = rospy.get_param('controller/trajectory_file', None)
+        x_scaling = rospy.get_param('controller/x_scaling', 1.0)
+        y_scaling = rospy.get_param('controller/y_scaling', 1.0)
+        v_scaling = rospy.get_param('controller/v_scaling', 1.0)
 
         self.n_x = rospy.get_param('controller/tracking/n')
         self.n_u = rospy.get_param('controller/tracking/d')
@@ -60,12 +62,25 @@ class trackingControlNode(object):
 
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
+
+        x_init = rospy.get_param('car/car_init/x', 0.0)
+        y_init = rospy.get_param('car/car_init/y', 0.0)
+        heading_init = rospy.get_param('car/car_init/heading', 0.0)
+        if type(heading_init) is str:
+            heading_init = eval(heading_init)
+        v_init = rospy.get_param('car/car_init/v', 0.0)
+
         self.x_boundary = rospy.get_param('/track/x_boundary')
         self.y_boundary = rospy.get_param('/track/y_boundary')
 
-        if self.trajectory_file is not None:
+        if trajectory_file is not None:
             # Load reference trajectory from file and set initial conditions
-            self.trajectory = np.multiply(load_vehicle_trajectory(self.trajectory_file), np.array([self.scaling_factor, self.scaling_factor, 1, self.scaling_factor]))
+            traj = load_vehicle_trajectory(trajectory_file)
+            traj -= np.array([traj[0,0], traj[0,1], 0, traj[0,3]])
+            traj = np.multiply(traj, np.array([x_scaling, y_scaling, 1, v_scaling]))
+            traj += np.array([x_init, y_init, 0, v_init])
+            self.trajectory = traj
+
             self.traj_len = self.trajectory.shape[0]
             rospy.set_param('/'.join((vehicle_ns,'car/car_init/x')), float(self.trajectory[0,0]))
             rospy.set_param('/'.join((vehicle_ns,'car/car_init/y')), float(self.trajectory[0,1]))
@@ -159,9 +174,9 @@ class trackingControlNode(object):
                 self.task_finished = True
                 shutdown_msg = '============ Track bounds exceeded reached. Controler SHUTTING DOWN ============'
             elif la.norm(np.array([x,y])-self.trajectory[-1,:2]) <= 0.10:
-                self.task_finished = True
+                # self.task_finished = True
                 shutdown_msg = '============ Goal position reached. Controler SHUTTING DOWN ============'
-                
+
             if self.task_finished:
                 self.ecu_pub.publish(ecu_msg)
                 self.bond_log.break_bond()
@@ -171,9 +186,11 @@ class trackingControlNode(object):
 
             if counter >= self.traj_len - 1:
                 Z_ref = np.tile(self.trajectory[-1], (self.N+1,1))
+                Z_ref[:,3] = 0
                 rospy.loginfo('TRACKING: End of trajectory reached')
             elif counter >= self.traj_len - (self.N+1):
                 Z_ref = np.vstack((self.trajectory[counter:], np.tile(self.trajectory[-1], ((self.N+1)-(self.traj_len-counter),1))))
+                Z_ref[:,3] = 0
             else:
                 Z_ref = self.trajectory[counter:counter+self.N+1]
 

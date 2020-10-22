@@ -6,6 +6,7 @@
 	Python Version: 2.7
 """
 import rospy
+import numpy as np
 
 from barc.utils.envs import OvalTrack, CircleTrack, LabTrack, LTrack, ParkingLane
 
@@ -16,6 +17,9 @@ def main():
 	rospy.init_node('obca_visualizer')
 
 	track_type = rospy.get_param('/track/shape')
+	num_parking_spots = rospy.get_param('/track/num_parking_spots')
+	parking_spot_width = rospy.get_param('/track/parking_spot_width')
+
 	plot_subplots = rospy.get_param('/visualization/plot_subplots', True)
 	plot_sim      = rospy.get_param('/visualization/plot_sim', True)
 	plot_est      = rospy.get_param('/visualization/plot_est', True)
@@ -23,7 +27,17 @@ def main():
 	namespaces = rospy.get_param('/visualization/namespaces')
 	colors = rospy.get_param('/visualization/colors')
 	trajectory_file = rospy.get_param('/target_vehicle/controller/trajectory_file', None)
-	scaling_factor = rospy.get_param('/target_vehicle/controller/scaling_factor', 1.0)
+	x_scaling = rospy.get_param('/target_vehicle/controller/x_scaling', 1.0)
+	y_scaling = rospy.get_param('/target_vehicle/controller/y_scaling', 1.0)
+	v_scaling = rospy.get_param('/target_vehicle/controller/v_scaling', 1.0)
+	x_init = rospy.get_param('/target_vehicle/car/car_init/x', 0.0)
+	y_init = rospy.get_param('/target_vehicle/car/car_init/y', 0.0)
+	heading_init = rospy.get_param('/target_vehicle/car/car_init/heading', 0.0)
+	if type(heading_init) is str:
+		heading_init = eval(heading_init)
+	v_init = rospy.get_param('/target_vehicle/car/car_init/v', 0.0)
+	trajectory_scaling = {'x': x_scaling, 'y': y_scaling, 'v': v_scaling}
+	trajectory_init = {'x': x_init, 'y': y_init, 'heading': heading_init, 'v': v_init}
 
 	dt = rospy.get_param('/visualization/dt')
 	loop_rate = 1.0/dt
@@ -38,13 +52,15 @@ def main():
 	elif track_type == "LTrack":
 		track = LTrack()
 	elif track_type == "ParkingLane":
-		track = ParkingLane()
+		track_length = rospy.get_param('/track/length')
+		track = ParkingLane(init_pos=(0, 0, 0), length=track_length)
 	else:
 		raise ValueError('Chosen Track shape not valid.')
 
 	vis_params = visualizerParams(dt=dt, plot_subplots=plot_subplots,
 		plot_sim=plot_sim, plot_est=plot_est,
-		trajectory_file=trajectory_file, scaling_factor=scaling_factor)
+		trajectory_file=trajectory_file, trajectory_scaling=trajectory_scaling, trajectory_init=trajectory_init,
+		parking_spot_width=parking_spot_width, num_parking_spots=num_parking_spots)
 	vis = barcOBCAVisualizer(track, vis_params)
 	for (n, c) in zip(namespaces, colors):
 		d = {'car_width' : rospy.get_param(n + '/car/plot/W'), 'car_length' : rospy.get_param(n + '/car/plot/L')}

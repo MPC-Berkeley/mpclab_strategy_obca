@@ -22,7 +22,10 @@ class visualizerParams(PythonMsg):
     plot_sensor: bool = field(default=False)
 
     trajectory_file: str = field(default=None)
-    scaling_factor: float = field(default=1.0)
+    trajectory_scaling: dict = field(default=None)
+    trajectory_init: dict = field(default=None)
+    parking_spot_width: float = field(default=0.32)
+    num_parking_spots: int = field(default=12)
 
 @dataclass
 class plotterParams(PythonMsg):

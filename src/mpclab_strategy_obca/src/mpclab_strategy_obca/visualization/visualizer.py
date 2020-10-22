@@ -21,6 +21,8 @@ class barcOBCAVisualizer(object):
 
         self.visualizer_params = params
         plot_subplots = params.plot_subplots
+        parking_spot_width = params.parking_spot_width
+        num_parking_spots = params.num_parking_spots
 
         self.fsm_state_ids = list(state_num_dict.values())
         self.fsm_state_names = list(state_num_dict.keys())
@@ -38,8 +40,12 @@ class barcOBCAVisualizer(object):
         self.axs = dict()
 
         if params.trajectory_file is not None:
-            scaling_factor = params.scaling_factor
-            trajectory = np.multiply(load_vehicle_trajectory(params.trajectory_file), np.array([scaling_factor, scaling_factor, 1, scaling_factor]))
+            trajectory_scaling = params.trajectory_scaling
+            trajectory_init = params.trajectory_init
+            trajectory = load_vehicle_trajectory(params.trajectory_file)
+            trajectory -= np.array([trajectory[0,0], trajectory[0,1], 0, trajectory[0,3]])
+            trajectory = np.multiply(trajectory, np.array([trajectory_scaling['x'], trajectory_scaling['y'], 1, trajectory_scaling['v']]))
+            trajectory += np.array([trajectory_init['x'], trajectory_init['y'], 0, trajectory_init['v']])
 
         ################ Trajectory Subplot ################
         if plot_subplots:
@@ -54,7 +60,22 @@ class barcOBCAVisualizer(object):
             axtr.plot(trajectory[:,0], trajectory[:,1])
 
         # User Defined map plotting
+        parking_spot_length = 0.6
+        track_length = self.track.track_length
+        track_width = self.track.track_width
+
+        # Plot lanes
         self.track.plot_map(axtr)
+
+        # Plot parking spots
+        axtr.plot([0, track_length], [track_width/2+parking_spot_length, track_width/2+parking_spot_length], color='#908E8E', linewidth=1.5)
+        axtr.plot([0, track_length], [-track_width/2-parking_spot_length, -track_width/2-parking_spot_length], color='#908E8E', linewidth=1.5)
+        axtr.plot([0, 0], [track_width/2, track_width/2+parking_spot_length], color='#908E8E', linewidth=1.5)
+        axtr.plot([0, 0], [-track_width/2, -track_width/2-parking_spot_length], color='#908E8E', linewidth=1.5)
+        for i in range(num_parking_spots):
+            axtr.plot([(i+1)*parking_spot_width, (i+1)*parking_spot_width], [track_width/2, track_width/2+parking_spot_length], color='#908E8E', linewidth=1.5)
+            axtr.plot([(i+1)*parking_spot_width, (i+1)*parking_spot_width], [-track_width/2, -track_width/2-parking_spot_length], color='#908E8E', linewidth=1.5)
+
         axtr.set_aspect('equal')
         self.axs['track'] = axtr
 
