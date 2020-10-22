@@ -3,6 +3,7 @@
 import rospy
 from bondpy import bondpy
 import numpy as np
+import numpy.linalg as la
 
 from barc.msg import ECU, States, Prediction
 from mpclab_strategy_obca.msg import FSMState
@@ -58,10 +59,15 @@ class naiveOBCAParameterizedControlNode(object):
         self.L_f = rospy.get_param('controller/dynamics/L_f')
         self.M = rospy.get_param('controller/dynamics/M')
 
+        self.x_goal = rospy.get_param('controller/x_goal')
+        self.y_goal = rospy.get_param('controller/y_goal')
+
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
         self.TV_L = rospy.get_param('/target_vehicle/car/plot/L')
         self.TV_W = rospy.get_param('/target_vehicle/car/plot/W')
+        self.x_boundary = rospy.get_param('/track/x_boundary')
+        self.y_boundary = rospy.get_param('/track/y_boundary')
 
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
         self.dynamics = bike_dynamics_rk4(dyn_params)
@@ -118,7 +124,6 @@ class naiveOBCAParameterizedControlNode(object):
         self.pred_pub = rospy.Publisher('pred_states', Prediction, queue_size=1)
         # Publisher for FSM state
         self.fsm_state_pub = rospy.Publisher('fsm_state', FSMState, queue_size=1)
-
         # Publisher for data logger
         # self.log_pub = rospy.Publisher('log_states', States, queue_size=1)
 
@@ -143,24 +148,34 @@ class naiveOBCAParameterizedControlNode(object):
         self.start_time = rospy.get_rostime().to_sec()
 
         while not rospy.is_shutdown():
-            t = rospy.get_rostime().to_sec() - self.start_time
-            ecu_msg = ECU()
-
-            if t-self.start_time >= self.max_time:
-                ecu_msg.servo = 0.0
-                ecu_msg.motor = 0.0
-                # Publish the final motor and steering commands
-                self.ecu_pub.publish(ecu_msg)
-
-                self.bond_log.break_bond()
-                self.bond_ard.break_bond()
-                rospy.signal_shutdown('Max time of %g reached, controller shutting down...' % self.max_time)
-
+            # Get EV state and TV prediction at current time
             EV_state = self.state
             TV_pred = self.tv_state_prediction[:self.N+1]
 
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
+            t = rospy.get_rostime().to_sec() - self.start_time
+
+            ecu_msg = ECU()
+            ecu_msg.servo = 0.0
+            ecu_msg.motor = 0.0
+            if t >= self.max_time and not self.task_finished:
+                shutdown_msg = '============ Max time of %g reached. Controler SHUTTING DOWN ============' % self.max_time
+                self.task_finished = True
+            elif (EV_x < self.x_boundary[0] or EV_x > self.x_boundary[1]) or (EV_y < self.y_boundary[0] or EV_y > self.y_boundary[1]) and not self.task_finished:
+                # Check if car has left the experiment area
+                self.task_finished = True
+                shutdown_msg = '============ Track bounds exceeded reached. Controler SHUTTING DOWN ============'
+            elif la.norm(np.array([EV_x-self.x_goal, EV_y-self.y_goal])) <= 0.10 and not self.task_finished:
+                self.task_finished = True
+                shutdown_msg = '============ Goal position reached. Controler SHUTTING DOWN ============'
+
+            if self.task_finished:
+                self.ecu_pub.publish(ecu_msg)
+                self.bond_log.break_bond()
+                self.bond_ard.break_bond()
+                rospy.loginfo(shutdown_msg)
+                rospy.signal_shutdown(shutdown_msg)
 
             X_ref = EV_x + np.arange(self.N+1)*self.dt*self.v_ref
             Z_ref = np.zeros((self.N+1, self.n_x))
@@ -212,16 +227,14 @@ class naiveOBCAParameterizedControlNode(object):
             else:
                 fsm_state = 'HOBCA-Unlocked'
 
-            self.ev_state_prediction = Z_pred
-            self.ev_input_prediction = U_pred
-
-            self.last_input = U_pred[0]
-
             ecu_msg = ECU()
             ecu_msg.servo = U_pred[0,0]
             ecu_msg.motor = U_pred[0,1]
             self.ecu_pub.publish(ecu_msg)
+            self.last_input = U_pred[0]
 
+            self.ev_state_prediction = Z_pred
+            self.ev_input_prediction = U_pred
             pred_msg = Prediction()
             pred_msg.x = Z_pred[:,0]
             pred_msg.y = Z_pred[:,1]

@@ -25,10 +25,10 @@ from mpclab_strategy_obca.state_machine.stateMachine import stateMachine
 from mpclab_strategy_obca.utils.types import experimentParams, experimentStates
 from mpclab_strategy_obca.utils.utils import get_car_poly, check_collision_poly, scale_state
 
-class strategyOBCAControlNode(object):
+class strategyOBCAParameterizedControlNode(object):
     def __init__(self):
         # Read parameter values from ROS parameter server
-        rospy.init_node('strategy_obca_control')
+        rospy.init_node('strategy_obca_param_control')
 
         self.dt = rospy.get_param('controller/dt')
         self.init_time = rospy.get_param('controller/init_time')
@@ -77,10 +77,15 @@ class strategyOBCAControlNode(object):
         self.L_f = rospy.get_param('controller/dynamics/L_f')
         self.M = rospy.get_param('controller/dynamics/M')
 
+        self.x_goal = rospy.get_param('controller/x_goal')
+        self.y_goal = rospy.get_param('controller/y_goal')
+
         self.EV_L = rospy.get_param('car/plot/L')
         self.EV_W = rospy.get_param('car/plot/W')
         self.TV_L = rospy.get_param('/target_vehicle/car/plot/L')
         self.TV_W = rospy.get_param('/target_vehicle/car/plot/W')
+        self.x_boundary = rospy.get_param('/track/x_boundary')
+        self.y_boundary = rospy.get_param('/track/y_boundary')
 
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
         self.dynamics = bike_dynamics_rk4(dyn_params)
@@ -176,31 +181,37 @@ class strategyOBCAControlNode(object):
         self.start_time = rospy.get_rostime().to_sec()
 
         while not rospy.is_shutdown():
-            t = rospy.get_rostime().to_sec() - self.start_time
-            ecu_msg = ECU()
-
-            if t >= self.max_time:
-                end_msg = 'Max time of %g reached, controller shutting down...' % self.max_time
-                self.task_finished = True
-            elif self.state_machine.state == 'End':
-                end_msg = 'Task finished, controller shutting down...'
-                self.task_finished = True
-            if self.task_finished:
-                ecu_msg.servo = 0.0
-                ecu_msg.motor = 0.0
-                # Publish the final motor and steering commands
-                self.ecu_pub.publish(ecu_msg)
-
-                self.bond_log.break_bond()
-                self.bond_ard.break_bond()
-                rospy.loginfo(end_msg)
-                rospy.signal_shutdown(end_msg)
-
+            # Get EV state and TV prediction at current time
             EV_state = self.state
             TV_pred = self.tv_state_prediction[:self.N+1]
 
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
+            t = rospy.get_rostime().to_sec() - self.start_time
+
+            ecu_msg = ECU()
+            ecu_msg.servo = 0.0
+            ecu_msg.motor = 0.0
+            if t >= self.max_time and not self.task_finished:
+                shutdown_msg = '============ Max time of %g reached. Controler SHUTTING DOWN ============' % self.max_time
+                self.task_finished = True
+            elif self.state_machine.state == 'End' and not self.task_finished:
+                shutdown_msg = '============ Controller reached END state. Controler SHUTTING DOWN ============'
+                self.task_finished = True
+            elif (EV_x < self.x_boundary[0] or EV_x > self.x_boundary[1]) or (EV_y < self.y_boundary[0] or EV_y > self.y_boundary[1]) and not self.task_finished:
+                # Check if car has left the experiment area
+                self.task_finished = True
+                shutdown_msg = '============ Track bounds exceeded reached. Controler SHUTTING DOWN ============'
+            elif la.norm(np.array([EV_x-self.x_goal, EV_y-self.y_goal])) <= 0.10 and not self.task_finished:
+                self.task_finished = True
+                shutdown_msg = '============ Goal position reached. Controler SHUTTING DOWN ============'
+
+            if self.task_finished:
+                self.ecu_pub.publish(ecu_msg)
+                self.bond_log.break_bond()
+                self.bond_ard.break_bond()
+                rospy.loginfo(shutdown_msg)
+                rospy.signal_shutdown(shutdown_msg)
 
             # Generate target vehicle obstacle descriptions
             self.obs[0] = get_car_poly(TV_pred, self.TV_W, self.TV_L)
@@ -273,7 +284,7 @@ class strategyOBCAControlNode(object):
 
             status_ws = self.obca_controller.solve_ws(Z_ws, U_ws, self.obs)
             if status_ws['success']:
-                rospy.loginfo('Warm start solved in %g s' % status_ws['solve_time'])
+                # rospy.loginfo('Warm start solved in %g s' % status_ws['solve_time'])
                 Z_obca, U_obca, status_sol = self.obca_controller.solve(EV_state, self.last_input, Z_ref, self.obs, hyp)
 
             if status_ws['success'] and status_sol['success']:
@@ -281,7 +292,7 @@ class strategyOBCAControlNode(object):
                 collision = False
             else:
                 feasible = False
-                rospy.loginfo('OBCA MPC not feasible, activating safety controller')
+                rospy.loginfo('============ OBCA MPC not feasible, activating safety controller ============')
             exp_state.feas = feasible
             self.state_machine.state_transition(exp_state)
 
@@ -297,13 +308,13 @@ class strategyOBCAControlNode(object):
 
             if self.state_machine.state in ['Free-Driving', 'HOBCA-Unlocked', 'HOBCA-Locked']:
                 Z_pred, U_pred = Z_obca, U_obca
-                rospy.loginfo('Applying HOBCA control')
+                rospy.loginfo('============ Applying HOBCA control ============')
             elif self.state_machine.state in ['Safe-Confidence', 'Safe-Yield', 'Safe-Infeasible']:
                 U_pred = np.vstack((u_safe, np.zeros((self.N-1, self.n_u))))
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))
                 for i in range(self.N):
                     Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
-                rospy.loginfo('Applying safety control')
+                rospy.loginfo('============ Applying safety control ============')
             elif self.state_machine.state in ['Emergency-Break']:
                 u_ebrake = self.emergency_controller.solve(EV_state, TV_pred, self.last_input)
 
@@ -311,20 +322,18 @@ class strategyOBCAControlNode(object):
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))
                 for i in range(self.N):
                     Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
-                rospy.loginfo('Applying ebrake control')
+                rospy.loginfo('============ Applying ebrake control ============')
             else:
                 raise RuntimeError('State unrecognized')
-
-            self.ev_state_prediction = Z_pred
-            self.ev_input_prediction = U_pred
-
-            self.last_input = U_pred[0]
 
             ecu_msg = ECU()
             ecu_msg.servo = U_pred[0,0]
             ecu_msg.motor = U_pred[0,1]
             self.ecu_pub.publish(ecu_msg)
+            self.last_input = U_pred[0]
 
+            self.ev_state_prediction = Z_pred
+            self.ev_input_prediction = U_pred
             pred_msg = Prediction()
             pred_msg.x = Z_pred[:,0]
             pred_msg.y = Z_pred[:,1]
@@ -345,7 +354,7 @@ class strategyOBCAControlNode(object):
             self.rate.sleep()
 
 if __name__ == '__main__':
-    strategy_obca_node = strategyOBCAControlNode()
+    strategy_obca_node = strategyOBCAParameterizedControlNode()
     try:
         strategy_obca_node.spin()
     except rospy.ROSInterruptException: pass
