@@ -166,7 +166,9 @@ class strategyOBCAParameterizedControlNode(object):
         self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
 
         self.start_time = 0
-        self.task_finished = False
+        self.task_finish = False
+        self.task_start = False
+        self.sleep_time = 1.0
 
         self.rate = rospy.Rate(1.0/self.dt)
 
@@ -177,7 +179,7 @@ class strategyOBCAParameterizedControlNode(object):
         self.tv_state_prediction = np.vstack((msg.x, msg.y, msg.psi, msg.v)).T
 
     def spin(self):
-        rospy.sleep(self.init_time)
+        rospy.sleep(self.sleep_time)
         self.start_time = rospy.get_rostime().to_sec()
 
         while not rospy.is_shutdown():
@@ -192,21 +194,26 @@ class strategyOBCAParameterizedControlNode(object):
             ecu_msg = ECU()
             ecu_msg.servo = 0.0
             ecu_msg.motor = 0.0
-            if t >= self.max_time and not self.task_finished:
-                shutdown_msg = '============ Max time of %g reached. Controler SHUTTING DOWN ============' % self.max_time
-                self.task_finished = True
-            elif self.state_machine.state == 'End' and not self.task_finished:
-                shutdown_msg = '============ Controller reached END state. Controler SHUTTING DOWN ============'
-                self.task_finished = True
-            elif (EV_x < self.x_boundary[0] or EV_x > self.x_boundary[1]) or (EV_y < self.y_boundary[0] or EV_y > self.y_boundary[1]) and not self.task_finished:
-                # Check if car has left the experiment area
-                self.task_finished = True
-                shutdown_msg = '============ Track bounds exceeded reached. Controler SHUTTING DOWN ============'
-            elif np.abs(EV_x-self.x_goal) <= 0.10 and not self.task_finished:
-                self.task_finished = True
-                shutdown_msg = '============ Goal position reached. Controler SHUTTING DOWN ============'
 
-            if self.task_finished:
+            if t >= self.init_time-self.sleep_time and not self.task_start:
+                self.task_start = True
+                rospy.loginfo('============ STRATEGY: Controler START ============')
+
+            if t >= self.max_time and not self.task_finish:
+                shutdown_msg = '============ STRATEGY: Max time of %g reached. Controler SHUTTING DOWN ============' % self.max_time
+                self.task_finish = True
+            elif self.state_machine.state == 'End' and not self.task_finish:
+                shutdown_msg = '============ STRATEGY: Controller reached END state. Controler SHUTTING DOWN ============'
+                self.task_finish = True
+            elif (EV_x < self.x_boundary[0] or EV_x > self.x_boundary[1]) or (EV_y < self.y_boundary[0] or EV_y > self.y_boundary[1]) and not self.task_finish:
+                # Check if car has left the experiment area
+                self.task_finish = True
+                shutdown_msg = '============ STRATEGY: Track bounds exceeded reached. Controler SHUTTING DOWN ============'
+            elif np.abs(EV_x-self.x_goal) <= 0.10 and not self.task_finish:
+                self.task_finish = True
+                shutdown_msg = '============ STRATEGY: Goal position reached. Controler SHUTTING DOWN ============'
+
+            if self.task_finish:
                 self.ecu_pub.publish(ecu_msg)
                 self.bond_log.break_bond()
                 self.bond_ard.break_bond()
@@ -292,7 +299,7 @@ class strategyOBCAParameterizedControlNode(object):
                 collision = False
             else:
                 feasible = False
-                rospy.loginfo('============ OBCA MPC not feasible, activating safety controller ============')
+                rospy.loginfo('============ STRATEGY: OBCA MPC not feasible, activating safety controller ============')
             exp_state.feas = feasible
             self.state_machine.state_transition(exp_state)
 
@@ -308,13 +315,13 @@ class strategyOBCAParameterizedControlNode(object):
 
             if self.state_machine.state in ['Free-Driving', 'HOBCA-Unlocked', 'HOBCA-Locked']:
                 Z_pred, U_pred = Z_obca, U_obca
-                rospy.loginfo('============ Applying HOBCA control ============')
+                rospy.loginfo('============ STRATEGY: Applying HOBCA control ============')
             elif self.state_machine.state in ['Safe-Confidence', 'Safe-Yield', 'Safe-Infeasible']:
                 U_pred = np.vstack((u_safe, np.zeros((self.N-1, self.n_u))))
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))
                 for i in range(self.N):
                     Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
-                rospy.loginfo('============ Applying safety control ============')
+                rospy.loginfo('============ STRATEGY: Applying safety control ============')
             elif self.state_machine.state in ['Emergency-Break']:
                 u_ebrake = self.emergency_controller.solve(EV_state, TV_pred, self.last_input)
 
@@ -322,18 +329,26 @@ class strategyOBCAParameterizedControlNode(object):
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))
                 for i in range(self.N):
                     Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
-                rospy.loginfo('============ Applying ebrake control ============')
+                rospy.loginfo('============ STRATEGY: Applying ebrake control ============')
             else:
-                raise RuntimeError('State unrecognized')
+                ecu_msg.servo = 0.0
+                ecu_msg.motor = 0.0
+                self.ecu_pub.publish(ecu_msg)
+                rospy.loginfo('============ STRATEGY: State unrecognized shutting down... ============')
 
-            ecu_msg = ECU()
-            ecu_msg.servo = U_pred[0,0]
-            ecu_msg.motor = U_pred[0,1]
+            if not self.task_start:
+                rospy.loginfo('============ STRATEGY: Node up time: %g s. Controller not yet started ============' % t)
+                self.last_input = np.zeros(self.n_u)
+            else:
+                ecu_msg.servo = U_pred[0,0]
+                ecu_msg.motor = U_pred[0,1]
+                self.last_input = U_pred[0]
+
             self.ecu_pub.publish(ecu_msg)
-            self.last_input = U_pred[0]
 
             self.ev_state_prediction = Z_pred
             self.ev_input_prediction = U_pred
+
             pred_msg = Prediction()
             pred_msg.x = Z_pred[:,0]
             pred_msg.y = Z_pred[:,1]

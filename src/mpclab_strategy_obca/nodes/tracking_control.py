@@ -143,7 +143,8 @@ class trackingControlNode(object):
         self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
 
         self.start_time = 0
-        self.task_finished = False
+        self.task_finish = False
+        self.task_start = False
 
         self.rate = rospy.Rate(1.0/self.dt)
 
@@ -151,9 +152,7 @@ class trackingControlNode(object):
         self.state = np.array([msg.x, msg.y, msg.psi, np.sign(msg.v_x)*np.sqrt(msg.v_x**2+msg.v_y**2)])
 
     def spin(self):
-        rospy.sleep(self.init_time)
 
-        rospy.loginfo('============ Controler START ============')
         self.start_time = rospy.get_rostime().to_sec()
         counter = 0
 
@@ -166,18 +165,24 @@ class trackingControlNode(object):
             ecu_msg = ECU()
             ecu_msg.servo = 0.0
             ecu_msg.motor = 0.0
-            if t >= self.max_time and not self.task_finished:
-                self.task_finished = True
-                shutdown_msg = '============ Max time of %g reached. Controler SHUTTING DOWN ============' % self.max_time
-            elif (x < self.x_boundary[0] or x > self.x_boundary[1]) or (y < self.y_boundary[0] or y > self.y_boundary[1]) and not self.task_finished:
-                # Check if car has left the experiment area
-                self.task_finished = True
-                shutdown_msg = '============ Track bounds exceeded reached. Controler SHUTTING DOWN ============'
-            elif np.abs(y) > 0.7 and np.abs(heading - np.pi/2) <= 10*np.pi/180:
-                self.task_finished = True
-                shutdown_msg = '============ Goal position reached. Controler SHUTTING DOWN ============'
 
-            if self.task_finished:
+            if t >= self.init_time and not self.task_start:
+                self.task_start = True
+                rospy.loginfo('============ TRACKING: Controler START ============')
+
+            if t >= self.max_time and not self.task_finish:
+                self.task_finish = True
+                shutdown_msg = '============ TRACKING: Max time of %g reached. Controler SHUTTING DOWN ============' % self.max_time
+            elif (x < self.x_boundary[0] or x > self.x_boundary[1]) or (y < self.y_boundary[0] or y > self.y_boundary[1]) and not self.task_finish:
+                # Check if car has left the experiment area
+                self.task_finish = True
+                shutdown_msg = '============ TRACKING: Track bounds exceeded reached. Controler SHUTTING DOWN ============'
+            # elif np.abs(y) > 0.7 and np.abs(heading - np.pi/2) <= 10*np.pi/180:
+            elif np.abs(y) > 0.7:
+                self.task_finish = True
+                shutdown_msg = '============ TRACKING: Goal position reached. Controler SHUTTING DOWN ============'
+
+            if self.task_finish:
                 self.ecu_pub.publish(ecu_msg)
                 self.bond_log.break_bond()
                 self.bond_ard.break_bond()
@@ -187,7 +192,7 @@ class trackingControlNode(object):
             if counter >= self.traj_len - 1:
                 Z_ref = np.tile(self.trajectory[-1], (self.N+1,1))
                 Z_ref[:,3] = 0
-                rospy.loginfo('TRACKING: End of trajectory reached')
+                rospy.loginfo('============ TRACKING: End of trajectory reached ============')
             elif counter >= self.traj_len - (self.N+1):
                 Z_ref = np.vstack((self.trajectory[counter:], np.tile(self.trajectory[-1], ((self.N+1)-(self.traj_len-counter),1))))
                 Z_ref[:,3] = 0
@@ -205,16 +210,21 @@ class trackingControlNode(object):
 
             Z_pred, U_pred, status_sol = self.tracking_controller.solve(state, self.last_input, Z_ref, Z_ws, U_ws)
 
-            if not status_sol['success']:
+            if not self.task_start:
+                rospy.loginfo('============ TRACKING: Node up time: %g s. Controller not yet started ============' % t)
+                self.last_input = np.zeros(self.n_u)
+            elif not status_sol['success']:
                 rospy.loginfo('============ TRACKING: MPC not feasible ============')
-                ecu_msg.servo = 0.0
-                ecu_msg.motor = 0.0
+                self.last_input = np.zeros(self.n_u)
+                Z_pred = np.zeros((self.N+1, self.n_x))
+                U_pred = np.zeros((self.N, self.n_u))
             else:
+                rospy.loginfo('============ TRACKING: Applying MPC control ============')
                 ecu_msg.servo = U_pred[0,0]
                 ecu_msg.motor = U_pred[0,1]
+                self.last_input = U_pred[0]
 
             self.ecu_pub.publish(ecu_msg)
-            self.last_input = U_pred[0]
 
             self.state_prediction = Z_pred
             self.input_prediction = U_pred
@@ -228,7 +238,8 @@ class trackingControlNode(object):
             pred_msg.a = U_pred[:,1]
             self.pred_pub.publish(pred_msg)
 
-            counter += 1
+            if self.task_start:
+                counter += 1
 
             self.rate.sleep()
 
