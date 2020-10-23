@@ -202,7 +202,7 @@ class strategyOBCAParameterizedControlNode(object):
                 # Check if car has left the experiment area
                 self.task_finished = True
                 shutdown_msg = '============ Track bounds exceeded reached. Controler SHUTTING DOWN ============'
-            elif la.norm(np.array([EV_x-self.x_goal, EV_y-self.y_goal])) <= 0.10 and not self.task_finished:
+            elif np.abs(EV_x-self.x_goal) <= 0.10 and not self.task_finished:
                 self.task_finished = True
                 shutdown_msg = '============ Goal position reached. Controler SHUTTING DOWN ============'
 

@@ -173,8 +173,8 @@ class trackingControlNode(object):
                 # Check if car has left the experiment area
                 self.task_finished = True
                 shutdown_msg = '============ Track bounds exceeded reached. Controler SHUTTING DOWN ============'
-            elif la.norm(np.array([x,y])-self.trajectory[-1,:2]) <= 0.10:
-                # self.task_finished = True
+            elif np.abs(y) > 0.7 and np.abs(heading - np.pi/2) <= 10*np.pi/180:
+                self.task_finished = True
                 shutdown_msg = '============ Goal position reached. Controler SHUTTING DOWN ============'
 
             if self.task_finished:
