@@ -14,7 +14,7 @@ from mpclab_strategy_obca.control.utils.types import trackingParams
 from mpclab_strategy_obca.dynamics.dynamicsModels import bike_dynamics_rk4
 from mpclab_strategy_obca.dynamics.utils.types import dynamicsKinBikeParams
 
-from mpclab_strategy_obca.utils.utils import load_vehicle_trajectory
+from mpclab_strategy_obca.utils.utils import load_vehicle_trajectory, get_trajectory_waypoints
 
 class trackingControlNode(object):
     def __init__(self):
@@ -77,9 +77,9 @@ class trackingControlNode(object):
         if trajectory_file is not None:
             # Load reference trajectory from file and set initial conditions
             traj = load_vehicle_trajectory(trajectory_file)
-            traj -= np.array([traj[0,0], traj[0,1], 0, traj[0,3]])
+            traj -= np.array([traj[0,0], traj[0,1], 0, 0])
             traj = np.multiply(traj, np.array([x_scaling, y_scaling, 1, v_scaling]))
-            traj += np.array([x_init, y_init, 0, v_init])
+            traj += np.array([x_init, y_init, 0, 0])
             self.trajectory = traj
 
             self.traj_len = self.trajectory.shape[0]
@@ -109,6 +109,11 @@ class trackingControlNode(object):
             v_ref = v_ref*np.ones(self.traj_len)
 
             self.trajectory = np.vstack((x_ref, y_ref, heading_ref, v_ref)).T
+
+        # Find trajectory key points (i.e. times where the reference velocity is close to zero)
+        # self.waypoints, self.next_ref_start = get_trajectory_waypoints(self.trajectory, 20, 0.1)
+        self.waypoints = self.trajectory[:2,-1].reshape((1,-1))
+        self.next_ref_start = [np.inf]
 
         dyn_params = dynamicsKinBikeParams(dt=self.dt, L_r=self.L_r, L_f=self.L_f, M=self.M)
         self.dynamics = bike_dynamics_rk4(dyn_params)
@@ -148,6 +153,7 @@ class trackingControlNode(object):
         self.start_time = None
         self.task_finish = False
         self.task_start = False
+        self.wait = False
 
         self.rate = rospy.Rate(1.0/self.dt)
 
@@ -157,6 +163,7 @@ class trackingControlNode(object):
     def spin(self):
         self.start_time = rospy.get_rostime().to_sec()
         counter = 0
+        waypt_counter = 0
         self.start_pub.publish(Float64(self.start_time))
         rospy.loginfo('============ TRACKING: Node START, time %g ============' % self.start_time)
 
@@ -180,7 +187,7 @@ class trackingControlNode(object):
             elif (x < self.x_boundary[0] or x > self.x_boundary[1]) or (y < self.y_boundary[0] or y > self.y_boundary[1]) and not self.task_finish:
                 # Check if car has left the experiment area
                 self.task_finish = True
-                shutdown_msg = '============ TRACKING: Track bounds exceeded reached. Controler SHUTTING DOWN ============'
+                shutdown_msg = '============ TRACKING: Track bounds exceeded. Controler SHUTTING DOWN ============'
             # elif np.abs(y) > 0.7 and np.abs(heading - np.pi/2) <= 10*np.pi/180:
             elif np.abs(y) > 0.7:
                 self.task_finish = True
@@ -193,7 +200,21 @@ class trackingControlNode(object):
                 rospy.loginfo(shutdown_msg)
                 rospy.signal_shutdown(shutdown_msg)
 
-            if counter >= self.traj_len - 1:
+            if la.norm(np.array([x,y])-self.waypoints[waypt_counter]) <= 0.2 and waypt_counter < self.waypoints.shape[0]-1 and not self.wait:
+                rospy.loginfo('============ TRACKING: Waypoint (%g,%g) reached ============' \
+                    % (self.waypoints[waypt_counter,0], self.waypoints[waypt_counter,1]))
+                self.wait = True
+                self.tracking_controller.Q = np.array([0,0,0,10])
+            if self.wait and counter >= self.next_ref_start[waypt_counter]:
+                rospy.loginfo('============ TRACKING: Setting next waypoint (%g,%g) ============' \
+                    % (self.waypoints[waypt_counter,0], self.waypoints[waypt_counter,1]))
+                self.wait = False
+                self.tracking_controller.Q = self.Q
+                waypt_counter += 1
+
+            if self.wait:
+                Z_ref = np.zeros((self.N+1, self.n_x))
+            elif counter >= self.traj_len - 1:
                 Z_ref = np.tile(self.trajectory[-1], (self.N+1,1))
                 Z_ref[:,3] = 0
                 rospy.loginfo('============ TRACKING: End of trajectory reached ============')
@@ -217,6 +238,11 @@ class trackingControlNode(object):
             if not self.task_start:
                 rospy.loginfo('============ TRACKING: Node up time: %g s. Controller not yet started ============' % t)
                 self.last_input = np.zeros(self.n_u)
+            elif self.wait:
+                rospy.loginfo('============ TRACKING: Stopping, waiting for reference to move past transition ============')
+                ecu_msg.servo = U_pred[0,0]
+                ecu_msg.motor = U_pred[0,1]
+                self.last_input = U_pred[0]
             elif not status_sol['success']:
                 rospy.loginfo('============ TRACKING: MPC not feasible ============')
                 self.last_input = np.zeros(self.n_u)

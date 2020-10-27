@@ -71,6 +71,37 @@ def load_vehicle_trajectory(filename):
 
     return TV_traj
 
+def get_trajectory_waypoints(trajectory, start_idx, vel_thresh):
+    waypoints = []
+    next_ref_start = []
+    cand_idxs = start_idx + np.argwhere(np.abs(trajectory[start_idx:,3]) <= vel_thresh).flatten()
+    print(cand_idxs)
+    if cand_idxs.size > 0:
+        segment_length = 0
+        segment_start = cand_idxs[0]
+        for (i, ci) in enumerate(cand_idxs):
+            if i == len(cand_idxs)-1 and segment_length >= 2:
+                waypoints.append(trajectory[segment_start,:2])
+                next_ref_start.append(segment_start + segment_length)
+                print(trajectory[segment_start-5:segment_start+segment_length])
+            elif i < len(cand_idxs)-1:
+                if cand_idxs[i+1] <= ci + 15:
+                    segment_length += 1
+                elif segment_length < 2:
+                    segment_length = 0
+                    segment_start = cand_idxs[i+1]
+                else:
+                    waypoints.append(trajectory[segment_start,:2])
+                    next_ref_start.append(segment_start + segment_length)
+                    print(trajectory[segment_start-5:segment_start+segment_length])
+                    segment_length = 0
+                    segment_start = cand_idxs[i+1]
+
+        waypoints.append(trajectory[-1,:2])
+    waypoints = np.array(waypoints)
+
+    return waypoints, next_ref_start
+
 if __name__ == '__main__':
     # W = 2
     # L = 4

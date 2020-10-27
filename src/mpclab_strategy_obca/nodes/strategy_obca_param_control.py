@@ -58,6 +58,7 @@ class strategyOBCAParameterizedControlNode(object):
         self.optlevel = rospy.get_param('controller/obca/optlevel')
         self.lock_steps = rospy.get_param('controller/obca/lock_steps')
         self.T_tv = rospy.get_param('controller/obca/T_tv')
+        self.confidence_thresh = rospy.get_param('controller/obca/confidence_thresh')
 
         self.nn_model_file = rospy.get_param('controller/obca/nn_model_file')
         self.smooth_prediction = rospy.get_param('controller/obca/smooth_prediction')
@@ -128,7 +129,7 @@ class strategyOBCAParameterizedControlNode(object):
         collision_buffer_r = np.sqrt(self.EV_L**2+self.EV_W**2)
         a_lim = np.array([self.accel_min, self.accel_max])
         exp_params = experimentParams(dt=self.dt, car_L=self.EV_L, car_W=self.EV_W,
-            N=self.N, collision_buffer_r=collision_buffer_r,
+            N=self.N, collision_buffer_r=collision_buffer_r, confidence_thresh=self.confidence_thresh,
             T=self.max_time, T_tv=self.T_tv, lock_steps=self.lock_steps, a_lim=a_lim)
         self.constraint_generator = hyperplaneConstraintGenerator(exp_params)
         self.state_machine = stateMachine(exp_params)

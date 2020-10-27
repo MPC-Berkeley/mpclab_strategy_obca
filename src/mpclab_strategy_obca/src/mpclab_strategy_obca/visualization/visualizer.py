@@ -11,7 +11,7 @@ from mpclab_strategy_obca.visualization.types import visualizerParams
 
 from mpclab_strategy_obca.state_machine.stateMachine import state_num_dict, num_state_dict
 
-from mpclab_strategy_obca.utils.utils import load_vehicle_trajectory
+from mpclab_strategy_obca.utils.utils import load_vehicle_trajectory, get_trajectory_waypoints
 
 matplotlib.use('TKAgg')
 
@@ -43,9 +43,12 @@ class barcOBCAVisualizer(object):
             trajectory_scaling = params.trajectory_scaling
             trajectory_init = params.trajectory_init
             trajectory = load_vehicle_trajectory(params.trajectory_file)
-            trajectory -= np.array([trajectory[0,0], trajectory[0,1], 0, trajectory[0,3]])
+            trajectory -= np.array([trajectory[0,0], trajectory[0,1], 0, 0])
             trajectory = np.multiply(trajectory, np.array([trajectory_scaling['x'], trajectory_scaling['y'], 1, trajectory_scaling['v']]))
-            trajectory += np.array([trajectory_init['x'], trajectory_init['y'], 0, trajectory_init['v']])
+            trajectory += np.array([trajectory_init['x'], trajectory_init['y'], 0, 0])
+
+            # waypoints, next_ref_start = get_trajectory_waypoints(trajectory, 20, 0.1)
+            waypoints = np.array([])
 
         ################ Trajectory Subplot ################
         if plot_subplots:
@@ -58,6 +61,9 @@ class barcOBCAVisualizer(object):
 
         if params.trajectory_file is not None:
             axtr.plot(trajectory[:,0], trajectory[:,1])
+            if waypoints.size > 0:
+                axtr.plot(waypoints[:,0], waypoints[:,1], 'ro')
+                axtr.plot(trajectory[next_ref_start,0], trajectory[next_ref_start,1], 'bx')
 
         # User Defined map plotting
         parking_spot_length = 0.6
