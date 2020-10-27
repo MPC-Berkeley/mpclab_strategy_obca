@@ -5,6 +5,7 @@ from bondpy import bondpy
 import numpy as np
 import numpy.linalg as la
 
+from std_msgs.msg import Float64
 from barc.msg import ECU, States, Prediction
 from mpclab_strategy_obca.msg import FSMState
 
@@ -132,8 +133,9 @@ class naiveOBCAParameterizedControlNode(object):
         self.bond_log = bondpy.Bond('controller_logger', bond_id)
         self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
 
-        self.start_time = 0
+        self.start_time = None
         self.task_finished = False
+        self.task_start = False
 
         self.rate = rospy.Rate(1.0/self.dt)
 
@@ -144,8 +146,9 @@ class naiveOBCAParameterizedControlNode(object):
         self.tv_state_prediction = np.vstack((msg.x, msg.y, msg.psi, msg.v)).T
 
     def spin(self):
-        rospy.sleep(self.init_time)
-        self.start_time = rospy.get_rostime().to_sec()
+        start_time_msg = rospy.wait_for_message('/start_time', Float64, timeout=10.0)
+        self.start_time = start_time_msg.data
+        rospy.loginfo('============ DIRECT: Node START, time %g ============' % self.start_time)
 
         while not rospy.is_shutdown():
             # Get EV state and TV prediction at current time
@@ -159,16 +162,21 @@ class naiveOBCAParameterizedControlNode(object):
             ecu_msg = ECU()
             ecu_msg.servo = 0.0
             ecu_msg.motor = 0.0
+
+            if t >= self.sleep_time and not self.task_start:
+                self.task_start = True
+                rospy.loginfo('============ DIRECT: Controler START ============')
+
             if t >= self.max_time and not self.task_finished:
-                shutdown_msg = '============ Max time of %g reached. Controler SHUTTING DOWN ============' % self.max_time
+                shutdown_msg = '============ DIRECT: Max time of %g reached. Controler SHUTTING DOWN ============' % self.max_time
                 self.task_finished = True
             elif (EV_x < self.x_boundary[0] or EV_x > self.x_boundary[1]) or (EV_y < self.y_boundary[0] or EV_y > self.y_boundary[1]) and not self.task_finished:
                 # Check if car has left the experiment area
                 self.task_finished = True
-                shutdown_msg = '============ Track bounds exceeded reached. Controler SHUTTING DOWN ============'
-            elif la.norm(np.array([EV_x-self.x_goal, EV_y-self.y_goal])) <= 0.10 and not self.task_finished:
+                shutdown_msg = '============ DIRECT: Track bounds exceeded reached. Controler SHUTTING DOWN ============'
+            elif np.abs(EV_x-self.x_goal) <= 0.10 and not self.task_finished:
                 self.task_finished = True
-                shutdown_msg = '============ Goal position reached. Controler SHUTTING DOWN ============'
+                shutdown_msg = '============ DIRECT: Goal position reached. Controler SHUTTING DOWN ============'
 
             if self.task_finished:
                 self.ecu_pub.publish(ecu_msg)
@@ -177,11 +185,11 @@ class naiveOBCAParameterizedControlNode(object):
                 rospy.loginfo(shutdown_msg)
                 rospy.signal_shutdown(shutdown_msg)
 
+            self.obs[0] = get_car_poly(TV_pred, self.TV_W, self.TV_L)
+
             X_ref = EV_x + np.arange(self.N+1)*self.dt*self.v_ref
             Z_ref = np.zeros((self.N+1, self.n_x))
             Z_ref[:,0] = X_ref
-
-            self.obs[0] = get_car_poly(TV_pred, self.TV_W, self.TV_L)
 
             if self.ev_state_prediction is None:
                 Z_ws = Z_ref
@@ -196,12 +204,12 @@ class naiveOBCAParameterizedControlNode(object):
             obca_mpc_safety = False
             status_ws = self.obca_controller.solve_ws(Z_ws, U_ws, self.obs)
             if status_ws['success']:
-                rospy.loginfo('Warm start solved in %g s' % status_ws['solve_time'])
+                # rospy.loginfo('Warm start solved in %g s' % status_ws['solve_time'])
                 Z_obca, U_obca, status_sol = self.obca_controller.solve(EV_state, self.last_input, Z_ref, self.obs)
 
             if not status_ws['success'] or not status_sol['success']:
                 obca_mpc_safety = True
-                rospy.loginfo('OBCA MPC not feasible, activating safety controller')
+                rospy.loginfo('============ DIRECT: OBCA MPC not feasible, activating safety controller ============')
 
             if obca_mpc_safety:
                 self.safety_controller.set_accel_ref(EV_v*np.cos(EV_heading), TV_v*np.cos(TV_heading))
@@ -212,6 +220,9 @@ class naiveOBCAParameterizedControlNode(object):
                 if collision:
                     obca_mpc_ebrake = True
                     u_safe = self.emergency_controller.solve(EV_state, TV_pred, self.last_input)
+                    rospy.loginfo('============ DIRECT: Applying ebrake control ============')
+                else:
+                    rospy.loginfo('============ DIRECT: Applying safety control ============')
 
                 U_pred = np.vstack((u_safe, np.zeros((self.N-1, self.n_u))))
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))
@@ -219,6 +230,7 @@ class naiveOBCAParameterizedControlNode(object):
                     Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
             else:
                 Z_pred, U_pred = Z_obca, U_obca
+                rospy.loginfo('============ DIRECT: Applying HOBCA control ============')
 
             if obca_mpc_ebrake:
                 fsm_state = 'Emergency-Break'
@@ -227,14 +239,19 @@ class naiveOBCAParameterizedControlNode(object):
             else:
                 fsm_state = 'HOBCA-Unlocked'
 
-            ecu_msg = ECU()
-            ecu_msg.servo = U_pred[0,0]
-            ecu_msg.motor = U_pred[0,1]
+            if not self.task_start:
+                rospy.loginfo('============ DIRECT: Node up time: %g s. Controller not yet started ============' % t)
+                self.last_input = np.zeros(self.n_u)
+            else:
+                ecu_msg.servo = U_pred[0,0]
+                ecu_msg.motor = U_pred[0,1]
+                self.last_input = U_pred[0]
+
             self.ecu_pub.publish(ecu_msg)
-            self.last_input = U_pred[0]
 
             self.ev_state_prediction = Z_pred
             self.ev_input_prediction = U_pred
+
             pred_msg = Prediction()
             pred_msg.x = Z_pred[:,0]
             pred_msg.y = Z_pred[:,1]
@@ -251,7 +268,7 @@ class naiveOBCAParameterizedControlNode(object):
             self.rate.sleep()
 
 if __name__ == '__main__':
-    naive_obca_node = naiveOBCAParameterizedControlNode()
+    direct_obca_node = naiveOBCAParameterizedControlNode()
     try:
-        naive_obca_node.spin()
+        direct_obca_node.spin()
     except rospy.ROSInterruptException: pass

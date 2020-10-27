@@ -5,8 +5,9 @@ from bondpy import bondpy
 import numpy as np
 import numpy.linalg as la
 
+from std_msgs.msg import Float64
 from barc.msg import ECU, States, Prediction
-from mpclab_strategy_obca.msg import FSMState, Scores
+from mpclab_strategy_obca.msg import FSMState, Scores, TimeStats
 
 from mpclab_strategy_obca.control.OBCAController import StrategyOBCAParameterizedController
 from mpclab_strategy_obca.control.safetyController import safetyController, emergencyController
@@ -157,18 +158,17 @@ class strategyOBCAParameterizedControlNode(object):
         self.fsm_state_pub = rospy.Publisher('fsm_state', FSMState, queue_size=1)
         # Publisher for FSM state
         self.score_pub = rospy.Publisher('strategy_scores', Scores, queue_size=1)
-        # Publisher for data logger
-        # self.log_pub = rospy.Publisher('log_states', States, queue_size=1)
+        # Publisher for timing statistics
+        self.time_stats_pub = rospy.Publisher('time_stats', TimeStats, queue_size=1)
 
         # Create bond to shutdown data logger and arduino interface when controller stops
         bond_id = rospy.get_param('car/name')
         self.bond_log = bondpy.Bond('controller_logger', bond_id)
         self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
 
-        self.start_time = 0
+        self.start_time = None
         self.task_finish = False
         self.task_start = False
-        self.sleep_time = 1.0
 
         self.rate = rospy.Rate(1.0/self.dt)
 
@@ -179,23 +179,28 @@ class strategyOBCAParameterizedControlNode(object):
         self.tv_state_prediction = np.vstack((msg.x, msg.y, msg.psi, msg.v)).T
 
     def spin(self):
-        rospy.sleep(self.sleep_time)
-        self.start_time = rospy.get_rostime().to_sec()
+        start_time_msg = rospy.wait_for_message('/start_time', Float64, timeout=5.0)
+        self.start_time = start_time_msg.data
+        rospy.sleep(0.5)
+        rospy.loginfo('============ STRATEGY: Node START, time %g ============' % self.start_time)
 
         while not rospy.is_shutdown():
+            t = rospy.get_rostime().to_sec() - self.start_time
+
+            time_stats_msg = TimeStats()
+
             # Get EV state and TV prediction at current time
             EV_state = self.state
             TV_pred = self.tv_state_prediction[:self.N+1]
 
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
-            t = rospy.get_rostime().to_sec() - self.start_time
 
             ecu_msg = ECU()
             ecu_msg.servo = 0.0
             ecu_msg.motor = 0.0
 
-            if t >= self.init_time-self.sleep_time and not self.task_start:
+            if t >= self.init_time and not self.task_start:
                 self.task_start = True
                 rospy.loginfo('============ STRATEGY: Controler START ============')
 
@@ -221,7 +226,9 @@ class strategyOBCAParameterizedControlNode(object):
                 rospy.signal_shutdown(shutdown_msg)
 
             # Generate target vehicle obstacle descriptions
+            t_s = rospy.get_rostime().to_sec()
             self.obs[0] = get_car_poly(TV_pred, self.TV_W, self.TV_L)
+            time_stats_msg.tv_obs_gen = rospy.get_rostime().to_sec() - t_s
 
             # Get target vehicle trajectory relative to ego vehicle state
             if self.state_machine.state in ['Safe-Confidence', 'Safe-Yield', 'Safe-Infeasible'] or EV_v*np.cos(EV_heading) <= 0:
@@ -241,7 +248,10 @@ class strategyOBCAParameterizedControlNode(object):
             # rel_state = scale_state(rel_state, rel_range, scale, bias)
 
             # Predict strategy to use
+            t_s = rospy.get_rostime().to_sec()
             scores = self.strategy_predictor.predict(rel_state.flatten(order='C'))
+            time_stats_msg.strategy_pred = rospy.get_rostime().to_sec() - t_s
+
             exp_state = experimentStates(t=t, EV_curr=EV_state, TV_pred=TV_pred, score=scores, ref_col=[False for _ in range(self.N+1)])
             self.state_machine.state_transition(exp_state)
 
@@ -259,12 +269,16 @@ class strategyOBCAParameterizedControlNode(object):
             Z_check = Z_ref
             scale_mult = 1.0
             scalings = np.maximum(np.ones(self.N+1), scale_mult*np.abs(TV_v)/self.v_ref)
+
+            t_s = rospy.get_rostime().to_sec()
             collisions = self.constraint_generator.check_collision_points(Z_check[:,:2], TV_pred, scalings)
+            time_stats_msg.ref_collision_check = rospy.get_rostime().to_sec() - t_s
 
             exp_state.ref_col = collisions
             self.state_machine.state_transition(exp_state)
 
             # Generate hyperplane constraints
+            t_s = rospy.get_rostime().to_sec()
             hyp = [{'w': np.array([np.sign(Z_check[i,0]),np.sign(Z_check[i,1]),0,0]), 'b': 0, 'pos': None} for i in range(self.N+1)]
             for i in range(self.N+1):
                 if collisions[i]:
@@ -279,6 +293,7 @@ class strategyOBCAParameterizedControlNode(object):
                     hyp_xy, hyp_w, hyp_b, _ = self.constraint_generator.generate_constraint(Z_check[i], TV_pred[i], d, scalings[i])
 
                     hyp[i] = {'w': np.concatenate((hyp_w, np.zeros(2))), 'b': hyp_b, 'pos': hyp_xy}
+            time_stats_msg.hyperplane_gen = rospy.get_rostime().to_sec() - t_s
 
             if self.ev_state_prediction is None:
                 Z_ws = Z_ref
@@ -289,10 +304,16 @@ class strategyOBCAParameterizedControlNode(object):
                 U_ws = np.vstack((self.ev_input_prediction[1:],
                     self.ev_input_prediction[-1]))
 
+            t_s = rospy.get_rostime().to_sec()
             status_ws = self.obca_controller.solve_ws(Z_ws, U_ws, self.obs)
+            time_stats_msg.warm_start_solve = rospy.get_rostime().to_sec() - t_s
             if status_ws['success']:
                 # rospy.loginfo('Warm start solved in %g s' % status_ws['solve_time'])
+                t_s = rospy.get_rostime().to_sec()
                 Z_obca, U_obca, status_sol = self.obca_controller.solve(EV_state, self.last_input, Z_ref, self.obs, hyp)
+                time_stats_msg.obca_solve = rospy.get_rostime().to_sec() - t_s
+            else:
+                time_stats_msg.obca_solve = -1
 
             if status_ws['success'] and status_sol['success']:
                 feasible = True
@@ -304,36 +325,45 @@ class strategyOBCAParameterizedControlNode(object):
             self.state_machine.state_transition(exp_state)
 
             if self.state_machine.state in ['Safe-Confidence', 'Safe-Yield', 'Safe-Infeasible']:
+                t_s = rospy.get_rostime().to_sec()
                 self.safety_controller.set_accel_ref(EV_v*np.cos(EV_heading), TV_v*np.cos(TV_heading))
                 u_safe = self.safety_controller.solve(EV_state, TV_pred, self.last_input)
 
                 z_next = self.dynamics.f_dt(EV_state, u_safe, type='numpy')
                 collision = check_collision_poly(z_next, (self.EV_W, self.EV_L), TV_pred[1], (self.TV_W, self.TV_L))
                 exp_state.actual_collision = collision
+                time_stats_msg.safety_solve = rospy.get_rostime().to_sec() - t_s
+            else:
+                time_stats_msg.safety_solve = -1
 
             self.state_machine.state_transition(exp_state)
 
             if self.state_machine.state in ['Free-Driving', 'HOBCA-Unlocked', 'HOBCA-Locked']:
                 Z_pred, U_pred = Z_obca, U_obca
+                time_stats_msg.ebrake_solve = -1
                 rospy.loginfo('============ STRATEGY: Applying HOBCA control ============')
             elif self.state_machine.state in ['Safe-Confidence', 'Safe-Yield', 'Safe-Infeasible']:
                 U_pred = np.vstack((u_safe, np.zeros((self.N-1, self.n_u))))
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))
                 for i in range(self.N):
                     Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
+                time_stats_msg.ebrake_solve = -1
                 rospy.loginfo('============ STRATEGY: Applying safety control ============')
             elif self.state_machine.state in ['Emergency-Break']:
+                t_s = rospy.get_rostime().to_sec()
                 u_ebrake = self.emergency_controller.solve(EV_state, TV_pred, self.last_input)
 
                 U_pred = np.vstack((u_ebrake, np.zeros((self.N-1, self.n_u))))
                 Z_pred = np.vstack((EV_state, np.zeros((self.N, self.n_x))))
                 for i in range(self.N):
                     Z_pred[i+1] = self.dynamics.f_dt(Z_pred[i], U_pred[i], type='numpy')
+                time_stats_msg.ebrake_solve = rospy.get_rostime().to_sec() - t_s
                 rospy.loginfo('============ STRATEGY: Applying ebrake control ============')
             else:
                 ecu_msg.servo = 0.0
                 ecu_msg.motor = 0.0
                 self.ecu_pub.publish(ecu_msg)
+                time_stats_msg.ebrake_solve = -1
                 rospy.loginfo('============ STRATEGY: State unrecognized shutting down... ============')
 
             if not self.task_start:
@@ -365,6 +395,9 @@ class strategyOBCAParameterizedControlNode(object):
             fsm_state_msg = FSMState()
             fsm_state_msg.fsm_state = self.state_machine.state
             self.fsm_state_pub.publish(fsm_state_msg)
+
+            time_stats_msg.total = (rospy.get_rostime().to_sec()-self.start_time) - t
+            self.time_stats_pub.publish(time_stats_msg)
 
             self.rate.sleep()
 

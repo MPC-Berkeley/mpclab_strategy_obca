@@ -52,6 +52,7 @@ add_message_files(
   FILES
   FSMState.msg
   Scores.msg
+  TimeStats.msg
 )
 
 ## Generate services in the 'srv' folder

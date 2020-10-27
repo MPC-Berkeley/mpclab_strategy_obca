@@ -5,6 +5,7 @@ from bondpy import bondpy
 import numpy as np
 import numpy.linalg as la
 
+from std_msgs.msg import Float64
 from barc.msg import ECU, States, Prediction
 
 from mpclab_strategy_obca.control.trackingController import trackingController
@@ -134,6 +135,8 @@ class trackingControlNode(object):
         self.ecu_pub = rospy.Publisher('ecu', ECU, queue_size=1)
         # Publisher for state predictions
         self.pred_pub = rospy.Publisher('pred_states', Prediction, queue_size=1)
+        # Publisher for tracking controller node start time (used as reference start time)
+        self.start_pub = rospy.Publisher('/start_time', Float64, queue_size=1, latch=True)
         # Publisher for data logger
         # self.log_pub = rospy.Publisher('log_states', States, queue_size=1)
 
@@ -142,7 +145,7 @@ class trackingControlNode(object):
         self.bond_log = bondpy.Bond('controller_logger', bond_id)
         self.bond_ard = bondpy.Bond('controller_arduino', bond_id)
 
-        self.start_time = 0
+        self.start_time = None
         self.task_finish = False
         self.task_start = False
 
@@ -152,9 +155,10 @@ class trackingControlNode(object):
         self.state = np.array([msg.x, msg.y, msg.psi, np.sign(msg.v_x)*np.sqrt(msg.v_x**2+msg.v_y**2)])
 
     def spin(self):
-
         self.start_time = rospy.get_rostime().to_sec()
         counter = 0
+        self.start_pub.publish(Float64(self.start_time))
+        rospy.loginfo('============ TRACKING: Node START, time %g ============' % self.start_time)
 
         while not rospy.is_shutdown():
             # Get state at current time
