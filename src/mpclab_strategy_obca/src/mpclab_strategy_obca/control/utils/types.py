@@ -26,6 +26,8 @@ class PIDParams(PythonMsg):
     du_max: float = field(default=None)
     du_min: float = field(default=None)
 
+    deadband: float = field(default=0.0)
+
 @dataclass
 class safetyParams(PythonMsg):
     dt: float = field(default=0.1)
@@ -51,6 +53,9 @@ class safetyParams(PythonMsg):
     steer_min: float = field(default=None)
     dsteer_max: float = field(default=None)
     dsteer_min: float = field(default=None)
+
+    deadband_accel: float = field(default=0.0)
+    deadband_steer: float = field(default=0.0)
 
 @dataclass
 class strategyOBCAParams(PythonMsg):

@@ -168,6 +168,7 @@ catkin_install_python(PROGRAMS
   nodes/naive_obca_param_control.py
   nodes/tracking_control.py
   nodes/obca_visualizer.py
+  nodes/safety_control.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

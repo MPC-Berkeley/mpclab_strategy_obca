@@ -74,6 +74,8 @@ class strategyOBCAParameterizedControlNode(object):
         self.P_steer = rospy.get_param('controller/safety/P_steer')
         self.I_steer = rospy.get_param('controller/safety/I_steer')
         self.D_steer = rospy.get_param('controller/safety/D_steer')
+        self.deadband_accel = rospy.get_param('controller/safety/deadband_accel')
+        self.deadband_steer = rospy.get_param('controller/safety/deadband_steer')
 
         self.L_r = rospy.get_param('controller/dynamics/L_r')
         self.L_f = rospy.get_param('controller/dynamics/L_f')
@@ -109,7 +111,8 @@ class strategyOBCAParameterizedControlNode(object):
             accel_max=self.accel_max, accel_min=self.accel_min,
             daccel_max=self.daccel_max, daccel_min=self.daccel_min,
             steer_max=self.steer_max, steer_min=self.steer_min,
-            dsteer_max=self.dsteer_max, dsteer_min=self.dsteer_min)
+            dsteer_max=self.dsteer_max, dsteer_min=self.dsteer_min,
+            deadband_accel=self.deadband_accel, deadband_steer=self.deadband_steer)
         self.safety_controller = safetyController(safety_params)
 
         emergency_params = safetyParams(dt=self.dt,
@@ -118,7 +121,8 @@ class strategyOBCAParameterizedControlNode(object):
             accel_max=self.accel_max, accel_min=self.accel_min,
             daccel_max=self.daccel_max, daccel_min=self.daccel_min,
             steer_max=self.steer_max, steer_min=self.steer_min,
-            dsteer_max=self.dsteer_max, dsteer_min=self.dsteer_min)
+            dsteer_max=self.dsteer_max, dsteer_min=self.dsteer_min,
+            deadband_accel=self.deadband_accel, deadband_steer=self.deadband_steer)
         self.emergency_controller = emergencyController(emergency_params)
 
         strategy_params = strategyPredictorParams(nn_model_file=self.nn_model_file, smooth_prediction=self.smooth_prediction,
@@ -375,6 +379,13 @@ class strategyOBCAParameterizedControlNode(object):
                 ecu_msg.motor = U_pred[0,1]
                 self.last_input = U_pred[0]
 
+            deadband = 0.05
+            if np.abs(ecu_msg.motor) <= deadband:
+                ecu_msg.motor = 0.0
+            elif ecu_msg.motor > deadband:
+                ecu_msg.motor = ecu_msg.motor - deadband
+            else:
+                ecu_msg.motor = ecu_msg.motor + deadband
             self.ecu_pub.publish(ecu_msg)
 
             self.ev_state_prediction = Z_pred

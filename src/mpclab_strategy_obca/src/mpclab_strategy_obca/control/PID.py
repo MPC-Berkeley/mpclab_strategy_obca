@@ -22,6 +22,8 @@ class PID(abstractController):
         self.du_max         = params.du_max
         self.du_min         = params.du_min
 
+        self.deadband       = params.deadband
+
         self.x_ref          = 0
         self.u_ref          = 0
 
@@ -85,6 +87,13 @@ class PID(abstractController):
             u = self._saturate_abs_high(u)
         if self.u_min is not None:
             u = self._saturate_abs_low(u)
+
+        if np.abs(u) <= self.deadband:
+            u = 0
+        elif u > self.deadband:
+            u = u - self.deadband
+        else:
+            u = u + self.deadband
 
         # Update error terms
         self.e  = e_t

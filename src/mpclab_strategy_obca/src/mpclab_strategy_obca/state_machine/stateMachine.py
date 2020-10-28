@@ -285,7 +285,7 @@ class stateMachine(object):
         rel_vx = TV_v * np.cos(TV_th) - EV_v * np.cos(EV_th)
         min_ts = np.ceil(-rel_vx / np.abs(self.a_lim[0]) / self.dt) # Number of timesteps requred for relative velocity to be zero
         v_brake = np.abs(rel_vx) + np.arange(min_ts+1) * self.dt * self.a_lim[0] # Velocity when applying max decceleration
-        brake_thresh = np.sum( np.abs(v_brake) * self.dt ) + 5 * self.collision_buffer_r # Distance threshold for safety controller to be applied
+        brake_thresh = np.sum( np.abs(v_brake) * self.dt ) + 1 * self.collision_buffer_r # Distance threshold for safety controller to be applied
         d = la.norm(TV_pred[:2,0] - EV_curr[:2]) # Distance between ego and target vehicles
 
         # Max score

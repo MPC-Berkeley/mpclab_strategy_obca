@@ -11,12 +11,14 @@ class safetyController(abstractController):
             Kp=params.P_accel, Ki=params.I_accel, Kd=params.D_accel,
             int_e_max=params.accel_int_e_max, int_e_min=params.accel_int_e_min,
             u_max=params.accel_max, u_min=params.accel_min,
-            du_max=params.daccel_max, du_min=params.daccel_min)
+            du_max=params.daccel_max, du_min=params.daccel_min,
+            deadband=params.deadband_accel)
         self.steer_pid_params = PIDParams(dt=params.dt,
             Kp=params.P_steer, Ki=params.I_steer, Kd=params.D_steer,
             int_e_max=params.steer_int_e_max, int_e_min=params.steer_int_e_min,
             u_max=params.steer_max, u_min=params.steer_min,
-            du_max=params.dsteer_max, du_min=params.dsteer_min)
+            du_max=params.dsteer_max, du_min=params.dsteer_min,
+            deadband=params.deadband_steer)
 
         self.accel_ref = 0
         self.steer_ref = 0
