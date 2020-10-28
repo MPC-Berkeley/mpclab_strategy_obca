@@ -155,19 +155,20 @@ class naiveOBCAParameterizedControlNode(object):
         rospy.loginfo('============ DIRECT: Node START, time %g ============' % self.start_time)
 
         while not rospy.is_shutdown():
+            t = rospy.get_rostime().to_sec() - self.start_time
+
             # Get EV state and TV prediction at current time
             EV_state = self.state
             TV_pred = self.tv_state_prediction[:self.N+1]
 
             EV_x, EV_y, EV_heading, EV_v = EV_state
             TV_x, TV_y, TV_heading, TV_v = TV_pred[0]
-            t = rospy.get_rostime().to_sec() - self.start_time
 
             ecu_msg = ECU()
             ecu_msg.servo = 0.0
             ecu_msg.motor = 0.0
 
-            if t >= self.sleep_time and not self.task_start:
+            if t >= self.init_time and not self.task_start:
                 self.task_start = True
                 rospy.loginfo('============ DIRECT: Controler START ============')
 
@@ -250,6 +251,14 @@ class naiveOBCAParameterizedControlNode(object):
                 ecu_msg.servo = U_pred[0,0]
                 ecu_msg.motor = U_pred[0,1]
                 self.last_input = U_pred[0]
+
+            # deadband = 0.01
+            # if np.abs(ecu_msg.motor) <= deadband:
+            #     ecu_msg.motor = 0.0
+            # elif ecu_msg.motor > deadband:
+            #     ecu_msg.motor = ecu_msg.motor - deadband
+            # else:
+            #     ecu_msg.motor = ecu_msg.motor + deadband
 
             self.ecu_pub.publish(ecu_msg)
 

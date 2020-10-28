@@ -259,7 +259,7 @@ class stateMachine(object):
         """
         rel_state = TV_pred - EV_curr
 
-        if np.all( rel_state[0, :] > 20 ) or rel_state[0, 0] < -self.collision_buffer_r or t > self.T_tv - self.N:
+        if np.all( rel_state[:,0] > 2 ) or rel_state[0,0] < -self.collision_buffer_r or t > self.T_tv - self.N:
             return True
         else:
             return False
@@ -268,25 +268,21 @@ class stateMachine(object):
         """
         The transition criteria to Safety Control - Confidence
         """
-        rel_state = TV_pred - TV_pred
+        rel_state = TV_pred - EV_curr
 
-        if np.all( rel_state[0, :] > 20 ) or rel_state[0, 0] < -self.collision_buffer_r:
+        if np.all( rel_state[0, :] > 2 ) or rel_state[0,0] < -self.collision_buffer_r:
             return False
 
         # Compute the distance threshold for applying braking assuming max
 	    # decceleration is applied
-
-        TV_v = la.norm(TV_pred[3:4, 0])
-        TV_th = TV_pred[2, 0]
-
-        EV_v = la.norm(EV_curr[3:4])
-        EV_th = EV_curr[2]
+        TV_x, TV_y, TV_th, TV_v = TV_pred[0]
+        EV_x, EV_y, EV_th, EV_v = EV_curr
 
         rel_vx = TV_v * np.cos(TV_th) - EV_v * np.cos(EV_th)
         min_ts = np.ceil(-rel_vx / np.abs(self.a_lim[0]) / self.dt) # Number of timesteps requred for relative velocity to be zero
         v_brake = np.abs(rel_vx) + np.arange(min_ts+1) * self.dt * self.a_lim[0] # Velocity when applying max decceleration
-        brake_thresh = np.sum( np.abs(v_brake) * self.dt ) + 1 * self.collision_buffer_r # Distance threshold for safety controller to be applied
-        d = la.norm(TV_pred[:2,0] - EV_curr[:2]) # Distance between ego and target vehicles
+        brake_thresh = np.sum( np.abs(v_brake) * self.dt ) + 3.0 * self.collision_buffer_r # Distance threshold for safety controller to be applied
+        d = la.norm([TV_x-EV_x, TV_y-EV_y]) # Distance between ego and target vehicles
 
         # Max score
         max_idx = np.argmax(score)
@@ -305,7 +301,7 @@ class stateMachine(object):
 
         rel_state = TV_pred - EV_curr
 
-        if np.all( rel_state[0, :] > 20 ) or rel_state[0, 0] < -self.collision_buffer_r:
+        if np.all( rel_state[:,0] > 2 ) or rel_state[0,0] < -self.collision_buffer_r:
             return False
 
         # Max score
@@ -325,7 +321,7 @@ class stateMachine(object):
         """
         rel_state = TV_pred - EV_curr
 
-        if np.all( rel_state[0, :] > 20 ) or rel_state[0, 0] < -self.collision_buffer_r:
+        if np.all( rel_state[:,0] > 2 ) or rel_state[0,0] < -self.collision_buffer_r:
             return False
 
         if not feas:
@@ -339,7 +335,7 @@ class stateMachine(object):
         """
         rel_state = TV_pred - EV_curr
 
-        if np.all( rel_state[0, :] > 20 ) or rel_state[0, 0] < -self.collision_buffer_r:
+        if np.all( rel_state[:,0] > 2 ) or rel_state[0,0] < -self.collision_buffer_r:
             return False
 
         # Max score
@@ -357,7 +353,7 @@ class stateMachine(object):
         """
         rel_state = TV_pred - EV_curr
 
-        if np.all( rel_state[0, :] > 20 ) or rel_state[0, 0] < -self.collision_buffer_r:
+        if np.all( rel_state[:,0] > 2 ) or rel_state[0,0] < -self.collision_buffer_r:
             return False
 
         # Max score

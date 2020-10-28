@@ -379,13 +379,14 @@ class strategyOBCAParameterizedControlNode(object):
                 ecu_msg.motor = U_pred[0,1]
                 self.last_input = U_pred[0]
 
-            deadband = 0.05
-            if np.abs(ecu_msg.motor) <= deadband:
-                ecu_msg.motor = 0.0
-            elif ecu_msg.motor > deadband:
-                ecu_msg.motor = ecu_msg.motor - deadband
-            else:
-                ecu_msg.motor = ecu_msg.motor + deadband
+            # deadband = 0.01
+            # if np.abs(ecu_msg.motor) <= deadband:
+            #     ecu_msg.motor = 0.0
+            # elif ecu_msg.motor > deadband:
+            #     ecu_msg.motor = ecu_msg.motor - deadband
+            # else:
+            #     ecu_msg.motor = ecu_msg.motor + deadband
+
             self.ecu_pub.publish(ecu_msg)
 
             self.ev_state_prediction = Z_pred
