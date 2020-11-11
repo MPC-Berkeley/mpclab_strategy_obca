@@ -8,7 +8,7 @@ Authors:
 - Edward Zhu, edward_zhu@berkeley.edu
 - Yvonne R. Stürz, y.stuerz@berkeley.edu
 
-A ROS and python package containing the code for online receding horizon OBCA control in tightly-constrained environments leveraging data-driven strategy prediction.
+A ROS and python package containing the code for online receding horizon OBCA control in tightly-constrained environments leveraging data-driven strategy prediction. The MATLAB simultion can be found in repo [`dataMPC_parking`](https://github.com/XuShenLZ/dataMPC_parking).
 
 This package is intended for use with the [`BARC_research`](https://github.com/MPC-Berkeley/BARC_research.git) simulation and experiment codebase.
 
