@@ -1,8 +1,12 @@
 # mpclab_strategy_obca
+Collision Avoidance in Tightly-Constrained Environments without Coordination: a Hierarchical Control Approach
+
+[Webpage](http://bit.ly/data-sg-control),  [arXiv](https://arxiv.org/abs/2011.00413)
 
 Authors:
-- Xu Shen: xu_shen@berkeley.edu
-- Edward Zhu: edward.zhu@berkeley.edu
+- Xu Shen, xu_shen@berkeley.edu
+- Edward Zhu, edward_zhu@berkeley.edu
+- Yvonne R. Stürz, y.stuerz@berkeley.edu
 
 A ROS and python package containing the code for online receding horizon OBCA control in tightly-constrained environments leveraging data-driven strategy prediction.
 
